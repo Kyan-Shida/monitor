@@ -10,15 +10,9 @@ import { useStore } from "../data/store";
 import { go } from "../data/navigation";
 import { Badge, Btn, Field, Modal, Note, Panel } from "../components/UI";
 import { ObjectLink, Kpis } from "../components/Business";
-import { constraints } from "../data/engine";
-import {
-  minutesLeft,
-  pointOf,
-  robotAvailability,
-  terminal,
-} from "../data/selectors";
+import { minutesLeft, pointOf, terminal } from "../data/selectors";
 import { DUE_SOON_MS, metricValue } from "../data/metrics";
-import type { Result, Robot, Task } from "../data/types";
+import type { Result } from "../data/types";
 
 // 即将超期阈值与低电量门槛统一由指标中心提供，避免工作台与报表出现两套口径
 
@@ -36,21 +30,13 @@ function shortTime(value: string) {
 }
 
 /**
- * 待办条目：左侧承载业务信息，右侧承载处理动作
- * @param children 业务信息区内容
- * @param actions 处理动作区内容
+ * 待办条目：只展示信息，不携带操作按钮
+ * @param children 待办主体内容
  */
-function Todo({
-  children,
-  actions,
-}: {
-  children: ReactNode;
-  actions: ReactNode;
-}) {
+function Todo({ children }: { children: ReactNode }) {
   return (
     <li className="todo-item">
       <div className="todo-main">{children}</div>
-      <div className="todo-actions">{actions}</div>
     </li>
   );
 }
@@ -70,8 +56,6 @@ export function Workbench() {
   const [value, VAL] = useState("");
   const [finalState, FS] = useState<"正常" | "异常">("正常");
   const [reason, REASON] = useState("");
-  // 派单选择：任务 ID → 机器人 ID，未选择时回退到首个满足条件的机器人
-  const [picked, PICKED] = useState<Record<string, string>>({});
 
   const pendingResults = s.results.filter((r) => r.status === "待复核");
   const pendingAlarms = s.alarms.filter((a) => a.state === "待确认");
@@ -112,47 +96,7 @@ export function Workbench() {
     !robotAttention.length &&
     !dueSoon.length;
 
-  /**
-   * 机器人下拉选项文案：下拉宽度有限，仅保留可用时刻，省去括号内的相对时长
-   * @param r 机器人
-   * @returns 形如 12:35 或 现在 的可用时刻
-   */
-  const availableAt = (r: Robot) => robotAvailability(s, r).split("（")[0];
 
-  /**
-   * 在当前页对任务派单：优先使用人工选择的机器人，否则取首个满足约束的机器人
-   * @param t 待调度任务
-   * @returns 无可用机器人时不执行任何动作
-   */
-  function assign(t: Task) {
-    const robotId = picked[t.id] || availableFor(t)[0]?.id;
-    if (robotId) act({ type: "ASSIGN", id: t.id, robotId });
-  }
-
-  /**
-   * 计算当前满足调度约束的机器人；地图/点位版本差异由平台自动安排同步窗口，不阻塞派单
-   * @param t 待调度任务
-   * @returns 可承接该任务的机器人列表
-   */
-  function availableFor(t: Task): Robot[] {
-    return s.robots.filter(
-      (r) =>
-        constraints(s, t, r).filter((x) => x !== "地图/点位版本待同步")
-          .length === 0,
-    );
-  }
-
-  /**
-   * 打开复核弹窗，并以当前结果的识别值作为默认表单内容
-   * @param r 待复核结果
-   */
-  function openReview(r: Result) {
-    REVIEWING(r);
-    CONC("确认");
-    VAL(r.final);
-    FS(r.abnormal ? "异常" : "正常");
-    REASON("");
-  }
 
   return (
     <>
@@ -205,17 +149,7 @@ export function Workbench() {
               {pendingResults.map((r) => {
                 const p = pointOf(s, r);
                 return (
-                  <Todo
-                    key={r.id}
-                    actions={
-                      <>
-                        <Btn primary onClick={() => openReview(r)}>
-                          复核
-                        </Btn>
-                        <Btn onClick={() => go("review", r.id)}>查看证据</Btn>
-                      </>
-                    }
-                  >
+                  <Todo key={r.id}>
                     <b>
                       {p?.device} · {p?.object} · {r.item}
                     </b>
@@ -243,20 +177,7 @@ export function Workbench() {
             <ul className="todo-list">
               {!pendingAlarms.length && <TodoEmpty text="没有待确认告警" />}
               {pendingAlarms.map((a) => (
-                <Todo
-                  key={a.id}
-                  actions={
-                    <>
-                      <Btn
-                        primary
-                        onClick={() => act({ type: "ALARM_ACK", id: a.id })}
-                      >
-                        确认告警
-                      </Btn>
-                      <Btn onClick={() => go("alarm", a.id)}>处置 / 复查</Btn>
-                    </>
-                  }
-                >
+                <Todo key={a.id}>
                   <b>
                     {a.name}
                     <Badge>{a.level}</Badge>
@@ -281,57 +202,24 @@ export function Workbench() {
           >
             <ul className="todo-list">
               {!pendingTasks.length && <TodoEmpty text="没有待调度任务" />}
-              {pendingTasks.map((t) => {
-                const robots = availableFor(t);
-                const selected = picked[t.id] || robots[0]?.id || "";
-                return (
-                  <Todo
-                    key={t.id}
-                    actions={
-                      <>
-                        <select
-                          aria-label={`为 ${t.name} 选择机器人`}
-                          value={selected}
-                          disabled={!robots.length}
-                          onChange={(e) =>
-                            PICKED((old) => ({ ...old, [t.id]: e.target.value }))
-                          }
-                        >
-                          {!robots.length && <option>暂无可用机器人</option>}
-                          {robots.map((r) => (
-                            <option key={r.id} value={r.id}>
-                              {r.id} · {availableAt(r)}
-                            </option>
-                          ))}
-                        </select>
-                        <Btn
-                          primary
-                          disabled={!robots.length}
-                          onClick={() => assign(t)}
-                        >
-                          派出
-                        </Btn>
-                        <Btn onClick={() => go("dispatch", t.id)}>调度详情</Btn>
-                      </>
-                    }
-                  >
-                    <b>
-                      {t.name}
-                      <Badge>{t.priority}</Badge>
-                    </b>
-                    <small className="todo-meta">
-                      {t.id} · {t.source} ·{" "}
-                      {s.maps.find((m) => m.id === t.mapId)?.name || t.mapId} ·{" "}
-                      {t.items.length} 个点位 · 预计需 {minutesLeft(t)} 分钟
-                    </small>
-                    <small className="todo-meta">
-                      {t.deadline
-                        ? `要求 ${shortTime(t.deadline)} 前完成`
-                        : "未设置完成时限"}
-                    </small>
-                  </Todo>
-                );
-              })}
+              {pendingTasks.map((t) => (
+                <Todo key={t.id}>
+                  <b>
+                    {t.name}
+                    <Badge>{t.priority}</Badge>
+                  </b>
+                  <small className="todo-meta">
+                    {t.id} · {t.source} ·{" "}
+                    {s.maps.find((m) => m.id === t.mapId)?.name || t.mapId} ·{" "}
+                    {t.items.length} 个点位 · 预计需 {minutesLeft(t)} 分钟
+                  </small>
+                  <small className="todo-meta">
+                    {t.deadline
+                      ? `要求 ${shortTime(t.deadline)} 前完成`
+                      : "未设置完成时限"}
+                  </small>
+                </Todo>
+              ))}
             </ul>
           </Panel>
         </div>
@@ -346,21 +234,7 @@ export function Workbench() {
                 <TodoEmpty text="机器人运行正常，地图版本一致" />
               )}
               {robotAttention.map(({ robot, reasons }) => (
-                <Todo
-                  key={robot.id}
-                  actions={
-                    <>
-                      <Btn onClick={() => go("robot", robot.id)}>机器人详情</Btn>
-                      {reasons.some((x) => x.startsWith("地图版本落后")) && (
-                        <Btn
-                          onClick={() => go("maps", robot.mapId, "sync")}
-                        >
-                          安排同步
-                        </Btn>
-                      )}
-                    </>
-                  }
-                >
+                <Todo key={robot.id}>
                   <b>
                     {robot.id} · {robot.name}
                     <Badge>{robot.state}</Badge>
@@ -384,26 +258,7 @@ export function Workbench() {
             <ul className="todo-list">
               {!dueSoon.length && <TodoEmpty text="没有临近完成时限的任务" />}
               {dueSoon.map((t) => (
-                <Todo
-                  key={t.id}
-                  actions={
-                    <>
-                      <Btn
-                        primary
-                        onClick={() =>
-                          go(
-                            ["执行中", "暂停", "待执行"].includes(t.state)
-                              ? "execution"
-                              : "dispatch",
-                            t.id,
-                          )
-                        }
-                      >
-                        立即处理
-                      </Btn>
-                    </>
-                  }
-                >
+                <Todo key={t.id}>
                   <b>
                     {t.name}
                     <Badge>{t.state}</Badge>

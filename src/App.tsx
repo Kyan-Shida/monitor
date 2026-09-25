@@ -75,7 +75,15 @@ import { CockpitScreen } from "./pages/CockpitScreen";
 import { Workbench } from "./pages/Workbench";
 import { Metrics } from "./pages/Metrics";
 /** 一级业务中心图标，顺序与 data/navigation 的 groups 一一对应 */
-const icons = [LayoutDashboard, Workflow, FileCheck, MapPinned, BarChart3, Settings];
+const icons = [
+  LayoutDashboard,
+  Workflow,
+  FileCheck,
+  MapPinned,
+  Bot,
+  BarChart3,
+  Settings,
+];
 /** 三级页面图标：按页面 ID 映射；未命中的页面不显示图标，仅保留文字 */
 const pageIcons: Record<string, LucideIcon> = {
   workbench: Gauge,
@@ -93,6 +101,11 @@ const pageIcons: Record<string, LucideIcon> = {
   alarms: BellRing,
   metrics: LineChart,
   robots: Bot,
+  robot: Bot,
+  health: Activity,
+  "robot-map": MapPinned,
+  manual: Terminal,
+  device: SlidersHorizontal,
   equipment: Boxes,
   objects: Layers,
   points: MapPin,
@@ -170,7 +183,17 @@ export default function App() {
   else if (page === "overview") body = <MonitorCockpit />;
   else if (page === "screen") body = <DispatchCockpit />;
   else if (page === "metrics") body = <Metrics />;
-  else if (["calendar", "robots", "robot", "health"].includes(page))
+  else if (
+    [
+      "calendar",
+      "robots",
+      "robot",
+      "health",
+      "robot-map",
+      "manual",
+      "device",
+    ].includes(page)
+  )
     body = <Operations page={page} id={id} tab={tab} />;
   else if (page === "maps") body = <Maps id={id} tab={tab} />;
   else if (page === "annotation") body = <Annotation id={id} />;

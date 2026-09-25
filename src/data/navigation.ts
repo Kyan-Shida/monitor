@@ -11,9 +11,11 @@ import { useState } from "react";
  * P1 页面为未实现占位，保留路由不删，但默认从菜单隐藏（见 hiddenIds）
  */
 export const groups = [
-  ["工作台", "workbench:任务工作台"],
+  ["工作台", "workbench:速览"],
   [
     "巡检执行",
+    "standards:巡检标准::标准与模板",
+    "templates:巡检模板::标准与模板",
     "plans:计划列表::任务与计划",
     "plan-edit:计划编辑::任务与计划",
     "tasks:任务列表::任务与计划",
@@ -25,6 +27,7 @@ export const groups = [
     "execution:实时执行监控::执行",
     "replay:执行回溯::执行",
     "control:远程操控台::远程操控",
+
   ],
   [
     "结果与异常",
@@ -37,17 +40,21 @@ export const groups = [
   ],
   [
     "资源与地图",
-    "robots:机器台账::机器设备与资产",
-    "robot:机器详情::机器设备与资产",
-    "health:健康 / 诊断::机器设备与资产",
     "equipment:设备资源树::点位与对象",
-    "objects:巡检对象与检测项::点位与对象",
     "points:巡检点列表::点位与对象",
     "annotation:点位标注与验证工作台::点位与对象",
     "routes:路线管理::路线与轨道",
-    "standards:巡检标准::标准与模板",
-    "templates:巡检模板::标准与模板",
+
     "maps:地图管理::地图",
+  ],
+  [
+    "机器人管理",
+    "robots:机器台账::机器人资产",
+    "robot:机器人运行监测::机器人资产",
+    "health:能力与健康::机器人能力",
+    "robot-map:地图与版本::机器人能力",
+    "manual:人工操作与遥控::机器人能力",
+    "device:机型专项::机器人能力",
   ],
   ["分析与报表", "metrics:指标中心", "analytics:基础分析"],
   [
@@ -72,12 +79,19 @@ const hiddenIds = [
   "services",
   "analytics",
   "media",
-  "health",
   "users",
   "quick",
   "objects",
 ];
-const roots = ["workbench", "execution", "result", "resource", "analytics", "system"];
+const roots = [
+  "workbench",
+  "execution",
+  "result",
+  "resource",
+  "robot",
+  "analytics",
+  "system",
+];
 const paths: Record<string, string> = {
   workbench: "workbench",
   overview: "monitor/overview",
@@ -88,6 +102,9 @@ const paths: Record<string, string> = {
   control: "robots/control",
   maps: "robots/maps",
   health: "robots/health",
+  "robot-map": "robots/map",
+  manual: "robots/manual",
+  device: "robots/device",
   equipment: "resources/equipment",
   objects: "resources/objects",
   points: "resources/points",

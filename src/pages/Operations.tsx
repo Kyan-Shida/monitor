@@ -36,7 +36,7 @@ export function Operations({
   const r = s.robots.find((r) => r.id === id) || s.robots[0];
   const t = currentTask(s, r);
   const queued = queueFor(s, r.id);
-  if (["calendar", "health"].includes(page))
+  if (page === "calendar")
     return <Legacy page={page} id={id} />;
   if (page === "robots") {
     const rows = s.robots.filter(
@@ -211,6 +211,148 @@ export function Operations({
       </>
     );
   }
+  // ====== 以下为「机器人管理」新一级目录下的独立二级页面 ======
+  // 复用原 robot 详情页 tab 内容，顶部补机器人选择与固定摘要
+  if (["health", "robot-map", "manual", "device"].includes(page)) {
+    const [selRobot, SR] = useViewState("robot-detail.selected", id);
+    const cur =
+      s.robots.find((x) => x.id === selRobot) ||
+      s.robots.find((x) => x.id === id) ||
+      s.robots[0];
+    if (!cur) return null;
+    const common = (
+      <div className="robot-fixed-summary">
+        <div className="robot-glyph">{cur.id}</div>
+        <div>
+          <h2>{cur.name}</h2>
+          <span>
+            {cur.deviceType} · {cur.region}
+          </span>
+        </div>
+        <select
+          aria-label="切换机器人"
+          value={cur.id}
+          onChange={(e) => SR(e.target.value)}
+        >
+          {s.robots.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.id} · {x.name} · {x.region}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+    if (page === "health")
+      return (
+        <>
+          {common}
+          <Panel title="能力、组件与业务影响">
+            <Table
+              heads={["能力 / 组件", "可用性", "业务影响"]}
+              rows={[
+                "视觉",
+                "红外",
+                "气体",
+                "声音",
+                "导航",
+                "电池",
+                "通信",
+              ].map((c) => [
+                c,
+                <Badge key={c}>
+                  {c === "声音" ||
+                  (c === "气体" && !cur.capabilities.includes("气体"))
+                    ? "未接入"
+                    : c === "电池" && cur.battery < 25
+                      ? "低电量"
+                      : "正常"}
+                </Badge>,
+                c === "声音"
+                  ? "一期未配置声音检测项"
+                  : c === "电池"
+                    ? "低于25%阻止执行"
+                    : "调度按照机器人实际能力校验",
+              ])}
+            />
+          </Panel>
+        </>
+      );
+    if (page === "robot-map")
+      return (
+        <>
+          {common}
+          <Panel title="当前实际激活版本">
+            <dl>
+              <dt>地图</dt>
+              <dd>
+                <ObjectLink type="maps" id={cur.mapId} tab="detail">
+                  {cur.mapId}
+                </ObjectLink>
+              </dd>
+              <dt>空间版本</dt>
+              <dd>m{cur.mapVersion}</dd>
+              <dt>点位版本</dt>
+              <dd>p{cur.pointSet}</dd>
+              <dt>最近同步</dt>
+              <dd>
+                <Badge>
+                  {s.syncs.find((x) => x.robotId === cur.id)?.state ||
+                    "初始激活副本"}
+                </Badge>
+              </dd>
+            </dl>
+            <Btn onClick={() => go("maps", cur.mapId, "sync")}>
+              版本同步工作台
+            </Btn>
+          </Panel>
+        </>
+      );
+    if (page === "manual")
+      return (
+        <>
+          {common}
+          <Panel title="受控人工操作入口">
+            <Note>
+              操作/遥控台采用独占会话。自动任务暂停确认后才获得人工遥控权，退出需核对版本与任务断点。
+            </Note>
+            <Btn primary onClick={() => go("control", cur.id)}>
+              进入独立操作 / 遥控台
+            </Btn>
+          </Panel>
+        </>
+      );
+    if (page === "device")
+      return (
+        <>
+          {common}
+          <Panel title={`${cur.deviceType}机型专项 · 差异配置`}>
+            <Note>{profileOf(cur.deviceType).summary}</Note>
+            <Table
+              heads={["配置维度", "本机型内容"]}
+              rows={[
+                ["移动能力", cur.mobility.join(" / ")],
+                [
+                  "机型约束",
+                  `最低派单电量 ${cur.constraints.minBattery}%` +
+                    (cur.constraints.railSectionId
+                      ? ` · 所在区段 ${cur.constraints.railSectionId}`
+                      : "") +
+                    (cur.constraints.maxSpeed
+                      ? ` · 限速 ${cur.constraints.maxSpeed} m/s`
+                      : ""),
+                ],
+                ["详情关注项", profileOf(cur.deviceType).detailTabs.join(" / ")],
+                ["地图图层", profileOf(cur.deviceType).mapLayers.join(" / ")],
+                ["操控重点", profileOf(cur.deviceType).controlPanel.join(" / ")],
+                ["告警类型", profileOf(cur.deviceType).alarmTypes.join(" / ")],
+                ["任务约束", profileOf(cur.deviceType).taskConstraints.join(" / ")],
+                ["健康度 / 固件", `${cur.health} · ${cur.firmware}`],
+              ]}
+            />
+          </Panel>
+        </>
+      );
+  }
   if (page === "robot")
     return (
       <>
@@ -242,12 +384,7 @@ export function Operations({
           {[
             ["monitor", "运行监测"],
             ["tasks", "任务"],
-            ["health", "能力与健康"],
-            ["map", "地图"],
             ["records", "运行记录"],
-            ["manual", "人工操作"],
-            // 机型专项：三类机器的差异关注项由 deviceProfile 驱动，页面不写机型分支
-            ["device", `${r.deviceType}专项`],
           ].map(([k, n]) => (
             <button
               className={tab === k ? "active" : ""}
@@ -362,103 +499,9 @@ export function Operations({
             </Panel>
           </>
         )}
-        {tab === "health" && (
-          <Panel title="能力、组件与业务影响">
-            <Table
-              heads={["能力 / 组件", "可用性", "业务影响"]}
-              rows={[
-                "视觉",
-                "红外",
-                "气体",
-                "声音",
-                "导航",
-                "电池",
-                "通信",
-              ].map((c) => [
-                c,
-                <Badge>
-                  {c === "声音" ||
-                  (c === "气体" && !r.capabilities.includes("气体"))
-                    ? "未接入"
-                    : c === "电池" && r.battery < 25
-                      ? "低电量"
-                      : "正常"}
-                </Badge>,
-                c === "声音"
-                  ? "一期未配置声音检测项"
-                  : c === "电池"
-                    ? "低于25%阻止执行"
-                    : "调度按照机器人实际能力校验",
-              ])}
-            />
-          </Panel>
-        )}
-        {tab === "map" && (
-          <Panel title="当前实际激活版本">
-            <dl>
-              <dt>地图</dt>
-              <dd>
-                <ObjectLink type="maps" id={r.mapId} tab="detail">
-                  {r.mapId}
-                </ObjectLink>
-              </dd>
-              <dt>空间版本</dt>
-              <dd>m{r.mapVersion}</dd>
-              <dt>点位版本</dt>
-              <dd>p{r.pointSet}</dd>
-              <dt>最近同步</dt>
-              <dd>
-                <Badge>
-                  {s.syncs.find((x) => x.robotId === r.id)?.state ||
-                    "初始激活副本"}
-                </Badge>
-              </dd>
-            </dl>
-            <Btn onClick={() => go("maps", r.mapId, "sync")}>
-              版本同步工作台
-            </Btn>
-          </Panel>
-        )}
         {tab === "records" && (
           <Panel title="故障、接管与任务事件">
             <EventTimeline robotId={r.id} />
-          </Panel>
-        )}
-        {tab === "manual" && (
-          <Panel title="受控人工操作入口">
-            <Note>
-              操作/遥控台采用独占会话。自动任务暂停确认后才获得人工遥控权，退出需核对版本与任务断点。
-            </Note>
-            <Btn primary onClick={() => go("control", r.id)}>
-              进入独立操作 / 遥控台
-            </Btn>
-          </Panel>
-        )}
-        {tab === "device" && (
-          <Panel title={`${r.deviceType}机型专项 · 差异配置`}>
-            <Note>{profileOf(r.deviceType).summary}</Note>
-            <Table
-              heads={["配置维度", "本机型内容"]}
-              rows={[
-                ["移动能力", r.mobility.join(" / ")],
-                [
-                  "机型约束",
-                  `最低派单电量 ${r.constraints.minBattery}%` +
-                    (r.constraints.railSectionId
-                      ? ` · 所在区段 ${r.constraints.railSectionId}`
-                      : "") +
-                    (r.constraints.maxSpeed
-                      ? ` · 限速 ${r.constraints.maxSpeed} m/s`
-                      : ""),
-                ],
-                ["详情关注项", profileOf(r.deviceType).detailTabs.join(" / ")],
-                ["地图图层", profileOf(r.deviceType).mapLayers.join(" / ")],
-                ["操控重点", profileOf(r.deviceType).controlPanel.join(" / ")],
-                ["告警类型", profileOf(r.deviceType).alarmTypes.join(" / ")],
-                ["任务约束", profileOf(r.deviceType).taskConstraints.join(" / ")],
-                ["健康度 / 固件", `${r.health} · ${r.firmware}`],
-              ]}
-            />
           </Panel>
         )}
       </>
