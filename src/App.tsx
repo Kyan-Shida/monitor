@@ -211,7 +211,7 @@ export default function App() {
     body = <Operations page={page} id={id} tab={tab} />;
   else if (page === "maps") body = <Maps id={id} tab={tab} />;
   else if (page === "annotation") body = <Annotation id={id} />;
-  else if (["point", "task-detail"].includes(page))
+  else if (["point", "task-detail", "replay-detail"].includes(page))
     body = <ObjectDetails page={page} id={id} />;
   else if (page === "archive") body = <DeviceArchive id={id} tab={tab} />;
   else if (["templates", "plans", "plan-edit", "tasks", "quick"].includes(page))
@@ -220,9 +220,9 @@ export default function App() {
     body = <Scheduling page={page} id={id} />;
   else if (page === "execution") body = <Execution id={id} />;
   else if (page === "control") body = <Control id={id} />;
-  else if (["results", "review"].includes(page))
+  else if (["results", "review", "result-detail"].includes(page))
     body = <Results page={page} id={id} />;
-  else if (["alarms", "alarm"].includes(page))
+  else if (["alarms", "alarm", "alarm-detail"].includes(page))
     body = <Alarms page={page} id={id} />;
   else if (page === "replay") body = <ObjectDetails page="replay" id={id} />;
   else body = <Supporting page={page} />;

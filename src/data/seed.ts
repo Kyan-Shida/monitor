@@ -1,4 +1,4 @@
-import type { State, Point, Task } from "./types";
+import type { State, Point, Task, Result, Log } from "./types";
 const points: Point[] = [
   {
     id: "P001",
@@ -113,6 +113,106 @@ const task = (
   /** 演示数据统一按「相对当前时间」生成，避免多日后打开时今日 / 本月统计为空 */
   created: dueIn(-75),
 });
+/**
+ * 生成一条巡检检测结果（演示种子数据）
+ * @description 原始采集值即外部 AI 识别输入，识别值默认等于原始值；修正场景由复核记录表达
+ * @param id 结果 ID
+ * @param taskId 所属任务 ID
+ * @param point 关联巡检点位（提供检测项 / 单位）
+ * @param raw 原始采集值
+ * @param final 最终值
+ * @param abnormal 业务判断是否异常
+ * @param status 复核状态（待复核 / 已确认 / 已识别 / 无效）
+ * @param minutes 采集时间，相对当前时间的分钟数（负数表示过去）
+ * @param confidence 外部 AI 识别置信度，默认 0.92
+ * @returns 规范化后的检测结果
+ */
+const result = (
+  id: string,
+  taskId: string,
+  point: Point,
+  raw: string,
+  final: string,
+  abnormal: boolean,
+  status: string,
+  minutes: number,
+  confidence = 0.92,
+): Result => ({
+  id,
+  taskId,
+  pointId: point.id,
+  item: point.item,
+  raw,
+  recognized: raw,
+  final,
+  unit: point.unit,
+  abnormal,
+  status,
+  source: "机器人采集 / 外部 AI 识别 v1.2",
+  confidence,
+  time: dueIn(minutes),
+  reviews: [],
+});
+/**
+ * 生成一个已结束任务的执行事件（下发 → 开始 → 逐项采集回执 → 结束）
+ * @description 供「过程回放 / 执行回溯」时间轴展示；采集回执按传入读数生成，时间在开始与结束之间均匀铺开
+ * @param id 任务 ID
+ * @param name 任务名称
+ * @param robotId 执行机器人 ID
+ * @param start 开始时间（相对当前时间的分钟数，负数表示过去）
+ * @param end 结束时间（相对当前时间的分钟数）
+ * @param readings 各检测项采集回执：`[点位说明, 读数文案, 配图色相]`
+ * @param finishDetail 结束回执文案；缺省为正常结束
+ * @returns 该任务按时间先后排列的事件列表
+ */
+const taskLogs = (
+  id: string,
+  name: string,
+  robotId: string,
+  start: number,
+  end: number,
+  readings: [string, string, number][],
+  finishDetail = "全部检测项完成，任务正常结束",
+): Log[] => {
+  /** 把第 i（0 起）个采集回执均匀落在开始与结束之间 */
+  const at = (i: number, n: number) =>
+    Math.round(start + ((end - start) * (i + 1)) / (n + 1));
+  const logs: Log[] = [
+    {
+      id: `${id}-D`,
+      time: dueIn(start),
+      action: "DISPATCH",
+      object: id,
+      detail: `${id} 下发至 ${robotId}，已核对 m3 / p7`,
+    },
+    {
+      id: `${id}-S`,
+      time: dueIn(start + 1),
+      action: "START",
+      object: id,
+      detail: `${robotId} 开始执行${name}`,
+    },
+  ];
+  readings.forEach(([label, reading, hue], i) =>
+    logs.push({
+      id: `${id}-T${i + 1}`,
+      time: dueIn(at(i, readings.length)),
+      action: "TICK",
+      object: id,
+      detail: `完成${label}采集`,
+      reading,
+      image: photo(`${label} ${reading}`, hue),
+    }),
+  );
+  logs.push({
+    id: `${id}-F`,
+    time: dueIn(end),
+    action: "TASK_FINISHED",
+    object: id,
+    detail: finishDetail,
+  });
+  return logs;
+};
 export function seed(): State {
   return {
     schema: 5,
@@ -245,6 +345,9 @@ export function seed(): State {
       },
       {
         ...task("T008", "罐区早班压力检测", "完成", "R01"),
+        created: dueIn(-118),
+        startedAt: dueIn(-110),
+        finishedAt: dueIn(-88),
         items: [{ ...points[0], mapVersion: 3, pointSet: 7 }],
         done: ["P001"],
         index: 1,
@@ -297,6 +400,91 @@ export function seed(): State {
         items: points.map((p) => ({ ...p, mapVersion: 3, pointSet: 7 })),
         index: 0,
       },
+      // ── 演示用：已完成任务（每个任务均有对应巡检结果，供「巡检结果」按任务维度分组展示）──
+      {
+        ...task("T030", "罐区清晨综合巡检", "完成", "R01"),
+        created: dueIn(-1080),
+        startedAt: dueIn(-1050),
+        finishedAt: dueIn(-1020),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
+      {
+        ...task("T031", "罐区早班综合巡检", "完成", "R01"),
+        created: dueIn(-960),
+        startedAt: dueIn(-930),
+        finishedAt: dueIn(-900),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
+      {
+        ...task("T032", "罐区夜班综合巡检", "完成", "R02"),
+        created: dueIn(-840),
+        startedAt: dueIn(-810),
+        finishedAt: dueIn(-780),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
+      {
+        ...task("T033", "V001 压力专项检测", "完成", "R01"),
+        created: dueIn(-705),
+        startedAt: dueIn(-675),
+        finishedAt: dueIn(-650),
+        items: [{ ...points[0], mapVersion: 3, pointSet: 7 }],
+        done: ["P001"],
+        index: 1,
+      },
+      {
+        ...task("T034", "罐区中班综合巡检", "完成", "R01"),
+        created: dueIn(-600),
+        startedAt: dueIn(-570),
+        finishedAt: dueIn(-540),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
+      {
+        ...task("T035", "V001 阀门状态巡检", "完成", "R02"),
+        created: dueIn(-490),
+        startedAt: dueIn(-460),
+        finishedAt: dueIn(-430),
+        items: [{ ...points[1], mapVersion: 3, pointSet: 7 }],
+        done: ["P002"],
+        index: 1,
+      },
+      {
+        ...task("T036", "罐区午间综合巡检", "完成", "R01"),
+        created: dueIn(-390),
+        startedAt: dueIn(-360),
+        finishedAt: dueIn(-330),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
+      {
+        ...task("T037", "V001 压力复测", "完成", "R01"),
+        created: dueIn(-300),
+        startedAt: dueIn(-270),
+        finishedAt: dueIn(-240),
+        items: [{ ...points[0], mapVersion: 3, pointSet: 7 }],
+        done: ["P001"],
+        index: 1,
+      },
+      {
+        ...task("T038", "V002 罐壁温度巡检", "完成", "R02"),
+        created: dueIn(-210),
+        startedAt: dueIn(-180),
+        finishedAt: dueIn(-150),
+        items: [{ ...points[2], mapVersion: 3, pointSet: 7 }],
+        done: ["P003"],
+        index: 1,
+      },
+      {
+        ...task("T039", "罐区交班综合巡检", "完成", "R01"),
+        created: dueIn(-130),
+        startedAt: dueIn(-100),
+        finishedAt: dueIn(-70),
+        done: ["P001", "P002", "P003"],
+        index: 3,
+      },
     ],
     results: [
       {
@@ -315,6 +503,45 @@ export function seed(): State {
         time: dueIn(-95),
         reviews: [],
       },
+      // ── 演示用：已完成 / 部分完成任务对应的巡检结果（按任务维度分组展示）──
+      // T020 罐区早班综合巡检（完成）
+      result("RES002", "T020", points[0], "0.62", "0.62", false, "已确认", -172),
+      result("RES003", "T020", points[1], "开启", "开启", false, "已确认", -165),
+      result("RES004", "T020", points[2], "38.5", "38.5", false, "已确认", -158),
+      // T021 V001 例行压力检测（部分完成，仅 P001 形成有效结果）
+      result("RES005", "T021", points[0], "0.55", "0.55", false, "已确认", -155),
+      // T030 罐区清晨综合巡检（完成）
+      result("RES006", "T030", points[0], "0.71", "0.71", false, "已确认", -1042),
+      result("RES007", "T030", points[1], "开启", "开启", false, "已确认", -1035),
+      result("RES008", "T030", points[2], "42.3", "42.3", false, "已确认", -1028),
+      // T031 罐区早班综合巡检（完成，压力超上限）
+      result("RES009", "T031", points[0], "0.88", "0.88", true, "已确认", -922),
+      result("RES010", "T031", points[1], "开启", "开启", false, "已确认", -915),
+      result("RES011", "T031", points[2], "45.1", "45.1", false, "已确认", -908),
+      // T032 罐区夜班综合巡检（完成，阀门未按期望开启）
+      result("RES012", "T032", points[0], "0.66", "0.66", false, "已识别", -802),
+      result("RES013", "T032", points[1], "关闭", "关闭", true, "待复核", -795),
+      result("RES014", "T032", points[2], "58.4", "58.4", false, "已确认", -788),
+      // T033 V001 压力专项检测（完成，压力超上限待复核）
+      result("RES015", "T033", points[0], "0.90", "0.90", true, "待复核", -660),
+      // T034 罐区中班综合巡检（完成，罐壁温度超限）
+      result("RES016", "T034", points[0], "0.58", "0.58", false, "已确认", -562),
+      result("RES017", "T034", points[1], "开启", "开启", false, "已确认", -555),
+      result("RES018", "T034", points[2], "61.2", "61.2", true, "已确认", -548),
+      // T035 V001 阀门状态巡检（完成）
+      result("RES019", "T035", points[1], "开启", "开启", false, "已确认", -445),
+      // T036 罐区午间综合巡检（完成）
+      result("RES020", "T036", points[0], "0.49", "0.49", false, "已确认", -352),
+      result("RES021", "T036", points[1], "开启", "开启", false, "已确认", -345),
+      result("RES022", "T036", points[2], "36.8", "36.8", false, "已确认", -338),
+      // T037 V001 压力复测（完成）
+      result("RES023", "T037", points[0], "0.77", "0.77", false, "已确认", -255),
+      // T038 V002 罐壁温度巡检（完成）
+      result("RES024", "T038", points[2], "33.2", "33.2", false, "已确认", -165),
+      // T039 罐区交班综合巡检（完成，压力超上限待复核）
+      result("RES025", "T039", points[0], "0.83", "0.83", true, "待复核", -92),
+      result("RES026", "T039", points[1], "开启", "开启", false, "已确认", -85),
+      result("RES027", "T039", points[2], "40.6", "40.6", false, "已识别", -78),
     ],
     alarms: [
       {
@@ -496,6 +723,96 @@ export function seed(): State {
         object: "T024",
         detail: "T024 已下发，等待 R02 接收",
       },
+      // ── 演示用：为已完成任务补齐执行事件，供「过程回放 / 执行回溯」时间轴展示 ──
+      ...taskLogs(
+        "T008",
+        "罐区早班压力检测",
+        "R01",
+        -110,
+        -88,
+        [["P001 出口压力表", "压力 0.92 MPa（超上限 0.8）", 205]],
+        "全部检测项完成，生成 1 条有效结果，已触发压力超限告警",
+      ),
+      ...taskLogs("T030", "罐区清晨综合巡检", "R01", -1050, -1020, [
+        ["P001 出口压力表", "压力 0.71 MPa", 205],
+        ["P002 出口阀门", "阀位 开启", 140],
+        ["P003 罐壁温度", "罐壁温度 42.3℃", 30],
+      ]),
+      ...taskLogs(
+        "T031",
+        "罐区早班综合巡检",
+        "R01",
+        -930,
+        -900,
+        [
+          ["P001 出口压力表", "压力 0.88 MPa（超上限 0.8）", 205],
+          ["P002 出口阀门", "阀位 开启", 140],
+          ["P003 罐壁温度", "罐壁温度 45.1℃", 30],
+        ],
+        "全部检测项完成，P001 压力超上限已记录",
+      ),
+      ...taskLogs(
+        "T032",
+        "罐区夜班综合巡检",
+        "R02",
+        -810,
+        -780,
+        [
+          ["P001 出口压力表", "压力 0.66 MPa", 205],
+          ["P002 出口阀门", "阀位 关闭（未按期望开启）", 8],
+          ["P003 罐壁温度", "罐壁温度 58.4℃", 30],
+        ],
+        "全部检测项完成，P002 阀门未按期望开启",
+      ),
+      ...taskLogs(
+        "T033",
+        "V001 压力专项检测",
+        "R01",
+        -675,
+        -650,
+        [["P001 出口压力表", "压力 0.90 MPa（超上限 0.8）", 205]],
+        "检测完成，P001 压力超上限，已进入待复核",
+      ),
+      ...taskLogs(
+        "T034",
+        "罐区中班综合巡检",
+        "R01",
+        -570,
+        -540,
+        [
+          ["P001 出口压力表", "压力 0.58 MPa", 205],
+          ["P002 出口阀门", "阀位 开启", 140],
+          ["P003 罐壁温度", "罐壁温度 61.2℃（超上限 60）", 30],
+        ],
+        "全部检测项完成，P003 罐壁温度超限",
+      ),
+      ...taskLogs("T035", "V001 阀门状态巡检", "R02", -460, -430, [
+        ["P002 出口阀门", "阀位 开启", 140],
+      ]),
+      ...taskLogs("T036", "罐区午间综合巡检", "R01", -360, -330, [
+        ["P001 出口压力表", "压力 0.49 MPa", 205],
+        ["P002 出口阀门", "阀位 开启", 140],
+        ["P003 罐壁温度", "罐壁温度 36.8℃", 30],
+      ]),
+      ...taskLogs("T037", "V001 压力复测", "R01", -270, -240, [
+        ["P001 出口压力表", "压力 0.77 MPa", 205],
+      ]),
+      ...taskLogs("T038", "V002 罐壁温度巡检", "R02", -180, -150, [
+        ["P003 罐壁温度", "罐壁温度 33.2℃", 30],
+      ]),
+      ...taskLogs(
+        "T039",
+        "罐区交班综合巡检",
+        "R01",
+        -100,
+        -70,
+        [
+          ["P001 出口压力表", "压力 0.83 MPa（超上限 0.8）", 205],
+          ["P002 出口阀门", "阀位 开启", 140],
+          ["P003 罐壁温度", "罐壁温度 40.6℃", 30],
+        ],
+        "全部检测项完成，P001 压力超上限，已进入待复核",
+      ),
     ],
     requests: [],
     extras: [

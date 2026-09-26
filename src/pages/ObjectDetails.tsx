@@ -75,6 +75,33 @@ export function ObjectDetails({ page, id }: { page: string; id?: string }) {
       </>
     );
   }
+  // 「执行回溯」内置页（设备巡检档案目录下）：只读回看单个已结束任务的执行事件与证据时间轴
+  if (page === "replay-detail") {
+    const tk = s.tasks.find((x) => x.id === id);
+    if (!tk) return <Note>未找到该任务。</Note>;
+    return (
+      <>
+        <div className="context-bar">
+          <b>
+            {tk.id} · {tk.name}
+          </b>
+          <Badge>{tk.state}</Badge>
+          <span className="muted">机器人 {tk.robotId || "未分配"}</span>
+          <span className="muted">
+            完成 {tk.done.length}/{tk.items.length} · 失败 {tk.skipped.length}
+          </span>
+          <span className="muted">结束 {fmtTime(tk.finishedAt)}</span>
+          <div className="actions">
+            <Btn onClick={() => go("replay", tk.id)}>打开完整回溯列表</Btn>
+          </div>
+        </div>
+        <Panel title="执行事件与证据时间轴">
+          <EventTimeline taskId={tk.id} />
+          {tk.failure && <Note>失败原因：{tk.failure}</Note>}
+        </Panel>
+      </>
+    );
+  }
   const t =
     s.tasks.find((t) => t.id === id) ||
     s.tasks.find((t) => t.state === "执行中") ||

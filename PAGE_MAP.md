@@ -120,6 +120,9 @@
 |---------|---------|---------|------|
 | `point` | `#/resources/points/detail/:id` | `src/pages/ObjectDetails.tsx` | 巡检点详情 |
 | `task-detail` | `#/planning/tasks/detail/:id` | `src/pages/ObjectDetails.tsx` | 任务详情 |
+| `result-detail` | `#/results/equipment/detail/:id` | `src/pages/Results.tsx`（`page="result-detail"`） | 结果详情（只读内置页），挂在设备巡检档案下，父页面 `archive` |
+| `alarm-detail` | `#/results/equipment/alarm/:id` | `src/pages/Results.tsx`（`Alarms` 的 `page="alarm-detail"`） | 告警详情（只读内置页），挂在设备巡检档案下，父页面 `archive` |
+| `replay-detail` | `#/results/equipment/replay/:id` | `src/pages/ObjectDetails.tsx`（`page="replay-detail"`） | 执行回溯（只读内置页），挂在设备巡检档案下，父页面 `archive` |
 
 ---
 
@@ -141,10 +144,10 @@
 | `Scheduling.tsx` | `dispatch` / `queue` | 调度工作台（选任务/选机器人 → 一次派单，原子动作 `ENQUEUE`/`DISPATCH_NOW`）/ 机器人任务队列（仅队列管理动作，无派单按钮） |
 | `Execution.tsx` | — | 实时执行监控 |
 | `Execution.tsx` → `Control` 导出 | — | 远程操控台（云台/速度/暂停） |
-| `Results.tsx` | `results` / `review` | 巡检结果查询 + 复核 |
+| `Results.tsx` | `results` / `review` / `result-detail` / `alarm-detail`（`Alarms` 导出含 `alarms` / `alarm` / `alarm-detail`） | 巡检结果查询（按任务分组可折叠）+ 复核 + 结果详情 + 告警详情/复核 |
 | `Alarms.tsx` | `alarms` / `alarm` | 告警事件列表 + 详情 |
 | `DeviceArchive.tsx` | — | 设备巡检档案（内部 tab 切换） |
-| `ObjectDetails.tsx` | `point` / `task-detail` / `replay` | 下钻详情复用页 |
+| `ObjectDetails.tsx` | `point` / `task-detail` / `replay-detail` / `replay` | 下钻详情复用页 |
 
 ### 组件层（src/components/）
 

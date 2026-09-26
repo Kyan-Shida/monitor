@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { useStore } from "../data/store";
+import { go } from "../data/navigation";
 import { Btn, Empty } from "./UI";
 import { logNames, taskEvents } from "../data/selectors";
 export function ObjectLink({
@@ -7,17 +8,31 @@ export function ObjectLink({
   id,
   children,
   tab,
+  to,
 }: {
   type: string;
   id?: string;
   children?: ReactNode;
   tab?: string;
+  /** 目标页面 ID：传入时渲染为可跳转入口（如结果详情内置页）；不传则保持纯展示，不做下钻 */
+  to?: string;
 }) {
-  // 纯展示：保留 ID/名称信息但不做下钻跳转，避免为下钻而切碎使用流程
+  // 默认纯展示：保留 ID/名称信息但不做下钻跳转，避免为下钻而切碎使用流程
   const text =
     typeof children === "string" || typeof children === "number"
       ? String(children)
       : id || type;
+  if (to)
+    return (
+      <button
+        type="button"
+        className="object-link goto"
+        title={`${text} · 查看详情`}
+        onClick={() => go(to, id, tab)}
+      >
+        {children || id || "—"}
+      </button>
+    );
   return (
     <span className="object-link" title={text}>
       {children || id || "—"}
@@ -152,18 +167,21 @@ export function Pager({
   page,
   count,
   size = 6,
+  unit = "条",
   onChange,
 }: {
   page: number;
   count: number;
   size?: number;
+  /** 计数单位：结果分页为"条"，任务维度分组分页为"个任务" */
+  unit?: string;
   onChange: (n: number) => void;
 }) {
   const max = Math.max(1, Math.ceil(count / size));
   return (
     <div className="pager">
       <span>
-        共 {count} 条 · 第 {Math.min(page, max)} / {max} 页
+        共 {count} {unit} · 第 {Math.min(page, max)} / {max} 页
       </span>
       <Btn disabled={page <= 1} onClick={() => onChange(page - 1)}>
         上一页

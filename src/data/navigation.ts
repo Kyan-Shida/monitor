@@ -124,6 +124,12 @@ const paths: Record<string, string> = {
   results: "results/query",
   review: "results/review",
   archive: "results/equipment",
+  /** 结果详情内置页：挂在设备巡检档案目录下，不进入巡检结果查询这一支 */
+  "result-detail": "results/equipment/detail",
+  /** 告警详情内置页：同样挂在设备巡检档案目录下，用于档案内的关联告警查看 */
+  "alarm-detail": "results/equipment/alarm",
+  /** 执行回溯内置页：挂在设备巡检档案目录下，用于档案内的任务过程回放 */
+  "replay-detail": "results/equipment/replay",
   services: "ai/services",
   rules: "alarms/rules",
   alarms: "alarms/events",
@@ -148,6 +154,9 @@ const parents: Record<string, string> = {
   annotation: "points",
   "plan-edit": "plans",
   review: "results",
+  "result-detail": "archive",
+  "alarm-detail": "archive",
+  "replay-detail": "archive",
   alarm: "alarms",
   point: "points",
   "task-detail": "tasks",
@@ -214,6 +223,30 @@ export const routeMeta = [
     name: "任务详情",
     path: paths["task-detail"],
     parent: "tasks",
+  },
+  {
+    // 结果详情内置页：无侧边栏入口，挂在设备巡检档案目录下，由档案内的结果引用点击进入
+    ...pages.find((x) => x.id === "archive")!,
+    id: "result-detail",
+    name: "结果详情",
+    path: paths["result-detail"],
+    parent: "archive",
+  },
+  {
+    // 告警详情内置页：无侧边栏入口，挂在设备巡检档案目录下，由档案内的关联告警进入
+    ...pages.find((x) => x.id === "archive")!,
+    id: "alarm-detail",
+    name: "告警详情",
+    path: paths["alarm-detail"],
+    parent: "archive",
+  },
+  {
+    // 执行回溯内置页：无侧边栏入口，挂在设备巡检档案目录下，由已结束任务的「过程回放」进入
+    ...pages.find((x) => x.id === "archive")!,
+    id: "replay-detail",
+    name: "执行回溯",
+    path: paths["replay-detail"],
+    parent: "archive",
   },
   {
     // 驾驶舱大屏：仅由顶栏入口以新标签页打开，故不写入 groups（不出现在侧边栏与中心 Tab）

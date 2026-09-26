@@ -407,6 +407,22 @@ h4 {
   color: #1d2a37;
   min-width: 72px;
 }
+/* 设备巡检任务面板：筛选器较多，允许头部换行，并让日期输入与下拉同风格 */
+.panel-archive-tasks .panel-head {
+  flex-wrap: wrap;
+}
+.panel-archive-tasks .panel-head > .actions {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.panel-archive-tasks .inline-filter input[type="date"] {
+  border: 1px solid #dfe6ef;
+  background: #fff;
+  padding: 3px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  color: #1d2a37;
+}
 .badge {
   display: inline-block;
   font-size: 10px;
@@ -491,6 +507,157 @@ h4 {
 .context-bar > span {
   color: #7b8c9b;
   font-size: 12px;
+}
+/* 巡检结果·任务维度：任务行可展开/收起明细，任务再多也只占一行高度 */
+.task-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 4px 0 14px;
+}
+.task-group {
+  margin-bottom: 8px;
+}
+.task-group-head {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  overflow: hidden;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.task-group-head:hover {
+  border-color: var(--blue);
+  box-shadow: 0 1px 5px rgba(35, 104, 189, 0.08);
+}
+/* 左侧判断色条：异常红 / 正常绿，配合行首判断徽标快速定位问题任务 */
+.task-group-head .tg-flag {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+}
+.task-group-head .tg-flag.abn {
+  background: #bf5b53;
+}
+.task-group-head .tg-flag.ok {
+  background: #31957f;
+}
+/* 任务判断徽标：正常 / 异常 N，实心高对比 */
+.task-group-head .tg-judge {
+  padding: 1px 9px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+}
+.task-group-head .tg-judge.abn {
+  background: #bf5b53;
+}
+.task-group-head .tg-judge.ok {
+  background: #31957f;
+}
+/* 异常任务整行极浅底色，进一步凸显 */
+.task-group-head.abn {
+  background: #fffafa;
+}
+/* 展开时与下方明细表拼接为一张卡片：底边去除、圆角让位给表格 */
+.task-group-head.open {
+  border-color: var(--blue);
+  border-bottom-color: transparent;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+/* 左侧信息块：标题行（任务名 + 状态）+ 元信息行（任务号 / 机器人 / 结束时间） */
+.task-group-head .tg-main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.task-group-head .tg-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.task-group-head .tg-title b {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1f3346;
+}
+.task-group-head .tg-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #8694a2;
+}
+.task-group-head .tg-meta i {
+  font-style: normal;
+  color: #c2ccd6;
+}
+.task-group-head .tg-caret {
+  flex: none;
+  width: 10px;
+  color: #7b8c9b;
+  font-size: 11px;
+}
+/* 右侧统计胶囊：检测 / 异常 / 待复核，异常与待复核按等级着色 */
+.task-group-head .tg-stats {
+  flex: none;
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.task-group-head .tg-stat {
+  padding: 2px 10px;
+  font-size: 12px;
+  color: #5a6b7b;
+  background: #f4f7fa;
+  border: 1px solid #e6ecf2;
+  border-radius: 11px;
+  white-space: nowrap;
+}
+.task-group-head .tg-stat b {
+  color: #21364d;
+  font-weight: 600;
+}
+.task-group-head .tg-stat.abn {
+  color: #b34a44;
+  background: #fdecec;
+  border-color: #f2c9c6;
+}
+.task-group-head .tg-stat.abn b {
+  color: #b34a44;
+}
+.task-group-head .tg-stat.warn {
+  color: #a07531;
+  background: #fdf6e8;
+  border-color: #efdcb4;
+}
+.task-group-head .tg-stat.warn b {
+  color: #a07531;
+}
+.task-group-head .tg-toggle {
+  flex: none;
+  color: var(--blue);
+  font-size: 12px;
+}
+.task-group-head.open + .table-scroll {
+  border: 1px solid var(--blue);
+  border-top: none;
+  border-radius: 0 0 5px 5px;
 }
 .grid {
   display: grid;
@@ -1541,6 +1708,14 @@ footer {
   border: 0;
   font: inherit;
   cursor: default;
+}
+/* 可跳转的对象引用（如结果 ID → 结果详情内置页）：仅显式传 to 时使用 */
+.object-link.goto {
+  color: var(--blue);
+  cursor: pointer;
+}
+.object-link.goto:hover {
+  text-decoration: underline;
 }
 /* KPI 条：分类分组 + 单行排布，1px 间隙透出底色形成分组分隔线 */
 .workbench-kpis {
