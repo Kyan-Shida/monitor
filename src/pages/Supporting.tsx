@@ -22,7 +22,41 @@ export function Supporting({ page }: { page: string }) {
     [name, N] = useState(""),
     [detail, D] = useState(""),
     [bid, B] = useState("BIZ-20260922-001"),
-    [selected, SEL] = useState("");
+    [selected, SEL] = useState(""),
+    /** 设备资源页「对象与检测项」弹窗开关：就地查看，不跳转离开当前页 */
+    [objectsOpen, OO] = useState(false);
+  /** 设备 → 对象 → 检测项 表格：objects 页面与设备资源页弹窗共用 */
+  const objectsTable = (
+    <Table
+      heads={[
+        "业务点位",
+        "设备 / 对象",
+        "检测项",
+        "类型 / 单位",
+        "必检",
+        "状态 / 版本",
+        "操作",
+      ]}
+      rows={s.points.map((p) => [
+        <ObjectLink type="point" id={p.id}>
+          {p.name}
+        </ObjectLink>,
+        <>
+          <ObjectLink type="archive" id={p.device.split(" ")[0]}>
+            {p.device}
+          </ObjectLink>
+          <small>{p.object}</small>
+        </>,
+        p.item,
+        `${p.kind} / ${p.unit || "状态"}`,
+        "是",
+        <>
+          <Badge>{p.state}</Badge> v{p.version}
+        </>,
+        <Btn onClick={() => go("annotation", p.mapId)}>编辑标注</Btn>,
+      ])}
+    />
+  );
   // 角色权限矩阵：管理员 / 非管理员 × 权限五要素，替代原通用配置表
   if (page === "roles") return <RoleMatrix />;
   if (["audit", "interface-log", "dispatch-log", "replay"].includes(page)) {
@@ -89,35 +123,7 @@ export function Supporting({ page }: { page: string }) {
           </Btn>
         }
       >
-        <Table
-          heads={[
-            "业务点位",
-            "设备 / 对象",
-            "检测项",
-            "类型 / 单位",
-            "必检",
-            "状态 / 版本",
-            "操作",
-          ]}
-          rows={s.points.map((p) => [
-            <ObjectLink type="point" id={p.id}>
-              {p.name}
-            </ObjectLink>,
-            <>
-              <ObjectLink type="archive" id={p.device.split(" ")[0]}>
-                {p.device}
-              </ObjectLink>
-              <small>{p.object}</small>
-            </>,
-            p.item,
-            `${p.kind} / ${p.unit || "状态"}`,
-            "是",
-            <>
-              <Badge>{p.state}</Badge> v{p.version}
-            </>,
-            <Btn onClick={() => go("annotation", p.mapId)}>编辑标注</Btn>,
-          ])}
-        />
+        {objectsTable}
       </Panel>
     );
   if (page === "integration")
@@ -339,19 +345,28 @@ export function Supporting({ page }: { page: string }) {
     <>
       <div className={page === "equipment" ? "grid template-layout" : ""}>
         {page === "equipment" && (
-          <Panel title="设备资源层级">
+          <Panel
+            title="设备资源层级"
+            extra={<Btn onClick={() => Q("")}>全部设备</Btn>}
+          >
+            {/* 层级用 CSS 缩进 + 字重/颜色表达，替代全角空格，保证各级对齐一致 */}
             <div className="resource-tree">
-              <b>石化企业</b>
-              <p>　一期装置</p>
-              <p>　　一期罐区</p>
+              <div className="rt-node rt-l0">石化企业</div>
+              <div className="rt-node rt-l1">一期装置</div>
+              <div className="rt-node rt-l2">一期罐区</div>
               {s.extras
                 .filter((x) => x.category === "equipment")
                 .map((x) => (
-                  <button key={x.id} onClick={() => Q(x.name)}>
-                    　　 {x.name}
+                  <button
+                    key={x.id}
+                    className={
+                      "rt-node rt-l3" + (q === x.name ? " active" : "")
+                    }
+                    onClick={() => Q(x.name)}
+                  >
+                    {x.name}
                   </button>
                 ))}
-              <Btn onClick={() => Q("")}>全部设备</Btn>
             </div>
           </Panel>
         )}
@@ -406,7 +421,7 @@ export function Supporting({ page }: { page: string }) {
                   {x.status === "启用" ? "停用" : "启用"}
                 </Btn>
                 {page === "equipment" && (
-                  <Btn onClick={() => go("objects")}>对象与检测项</Btn>
+                  <Btn onClick={() => OO(true)}>对象与检测项</Btn>
                 )}
               </div>,
             ])}
@@ -453,6 +468,18 @@ export function Supporting({ page }: { page: string }) {
           >
             保存
           </Btn>
+        </Modal>
+      )}
+      {/* 设备资源页：就地查看「对象与检测项」，不离开当前页 */}
+      {objectsOpen && (
+        <Modal title="设备 → 对象 → 检测项" onClose={() => OO(false)} wide>
+          {objectsTable}
+          <div className="modal-actions">
+            <Btn onClick={() => OO(false)}>关闭</Btn>
+            <Btn primary onClick={() => go("annotation")}>
+              业务标注工作台
+            </Btn>
+          </div>
         </Modal>
       )}
     </>

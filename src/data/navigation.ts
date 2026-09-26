@@ -21,11 +21,11 @@ export const groups = [
     "tasks:任务列表::任务与计划",
     "quick:目标与要求::任务与计划",
     "calendar:任务日历::任务与计划",
-    "dispatch:调度工作台::调度",
+    "dispatch:任务调度工作台::调度",
     "queue:机器人任务队列::调度",
     "dispatch-log:调度记录::调度",
     "execution:实时执行监控::执行",
-    "replay:执行回溯::执行",
+    "replay:执行回溯记录::执行",
     "control:远程操控台::远程操控",
 
   ],
@@ -178,6 +178,27 @@ export const pages = groups.flatMap((g, i) =>
 );
 /** 侧边栏可见页面：过滤掉未实现占位页 */
 export const visiblePages = pages.filter((p) => !p.hidden);
+/** 侧边栏实际渲染的叶子：与 App.tsx 中 nav-leaf 的过滤条件（可见且无父级）保持一致 */
+const isLeaf = (id: string) =>
+  visiblePages.some((p) => p.id === id && !p.parent);
+/**
+ * 取侧边栏应高亮的页面 ID
+ * 详情页 / 内置子页（任务详情、巡检点详情、告警详情、结果复核…）不在侧边栏叶子中，
+ * 逐级回落到其列表父页，保证打开这些页面时侧边栏仍保持高亮，不会丢失选中态
+ * @param page 当前页面 ID
+ * @returns 侧边栏叶子页面 ID；无可用父级时返回原页面 ID
+ */
+export function menuIdOf(page: string): string {
+  let cur = page;
+  const seen = new Set<string>([cur]);
+  while (!isLeaf(cur)) {
+    const parent = parentOf(cur);
+    if (!parent || seen.has(parent)) break;
+    seen.add(parent);
+    cur = parent;
+  }
+  return cur;
+}
 export const routeMeta = [
   ...pages,
   {
@@ -234,53 +255,37 @@ export function href(page: string, id?: string, tab?: string) {
   );
 }
 
-interface Trail {
-  hash: string;
-  label: string;
-  parent?: Trail;
-  scroll: number;
-}
-const routeTrail = new Map<string, Trail | undefined>();
-export function currentTrail() {
-  return routeTrail.get(location.hash);
-}
-export function labelForHash(hash: string) {
-  const r = parse(hash),
-    m = routeMeta.find((x) => x.id === r.page);
-  return (m?.name || r.page) + (r.id ? " · " + r.id : "");
-}
 export function go(page: string, id?: string, tab?: string) {
   const next = href(page, id, tab);
   if (next === location.hash) return;
-  const current = parse();
-  if (current.page === page && current.id === id && current.tab !== tab) {
-    routeTrail.set(next, currentTrail());
-  } else {
-    routeTrail.set(next, {
-      hash: location.hash || href("overview"),
-      label: labelForHash(location.hash),
-      parent: currentTrail(),
-      scroll: document.querySelector("main")?.scrollTop || 0,
-    });
-  }
   location.hash = next;
 }
+/**
+ * 取当前页面在导航目录中的上一级（按目录层级，而非访问历史）
+ * 层级链：内置详情页 → 所属二级页面（菜单列表页）→ 结束
+ * @description 返回链在二级页面终止，不再上跳到一级中心入口或工作台；
+ *              仅不在目录树中的页面（驾驶舱等）回落到角色工作台
+ * @param page 当前页面 ID
+ * @returns 上一级页面 ID；已处于返回链终点时返回 undefined
+ */
+export function parentTargetOf(page: string): string | undefined {
+  const meta = routeMeta.find((x) => x.id === page);
+  // 内置 / 详情子页（任务详情、巡检点详情…）：回到其列表父页，到此结束
+  if (meta?.parent) return meta.parent;
+  // 菜单页面（二级列表页 / 工作台）即返回链终点，不再继续上跳
+  if (meta) return undefined;
+  // 不在目录树中的页面（驾驶舱 overview / screen）：回到角色工作台
+  return "workbench";
+}
+/**
+ * 返回操作：沿导航目录逐级向上，不依赖点击历史
+ * @description 内置页 → 二级列表页（终点）；驾驶舱 → 工作台
+ */
 export function back() {
-  const source = currentTrail();
-  if (source) {
-    routeTrail.set(source.hash, source.parent);
-    location.hash = source.hash;
-    setTimeout(
-      () => document.querySelector("main")?.scrollTo(0, source.scroll),
-      50,
-    );
-  } else {
-    const r = parse();
-    go(routeMeta.find((x) => x.id === r.page)?.parent || "overview");
-  }
+  const target = parentTargetOf(parse().page);
+  if (target) go(target);
 }
 export function goCenter(page: string) {
-  routeTrail.set(href(page), undefined);
   location.hash = href(page);
 }
 export function useViewState<T>(

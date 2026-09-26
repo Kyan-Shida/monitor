@@ -67,6 +67,23 @@ const dueIn = (minutes: number) => {
 const dayIn = (minutes: number) => dueIn(minutes).slice(0, 10);
 /** 取相对当前时间的「HH:mm」，用于责任链时间线 */
 const hhmmIn = (minutes: number) => dueIn(minutes).slice(11);
+/**
+ * 生成一张"现场证据照片"占位图（离线 SVG data URI，无需联网）
+ * 用于执行事件与证据时间轴展示采集到的图片证据
+ */
+const photo = (label: string, hue: number) => {
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='320' height='200'>
+    <defs><linearGradient id='g' x1='0' y1='0' x2='1' y2='1'>
+      <stop offset='0' stop-color='hsl(${hue},58%,52%)'/>
+      <stop offset='1' stop-color='hsl(${hue + 28},52%,32%)'/>
+    </linearGradient></defs>
+    <rect width='100%' height='100%' fill='url(#g)'/>
+    <circle cx='158' cy='88' r='44' fill='rgba(255,255,255,.16)'/>
+    <rect x='14' y='14' width='42' height='7' rx='3' fill='rgba(255,255,255,.5)'/>
+    <text x='16' y='184' font-family='sans-serif' font-size='13' fill='rgba(255,255,255,.92)'>${label}</text>
+  </svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
 const task = (
   id: string,
   name: string,
@@ -98,7 +115,7 @@ const task = (
 });
 export function seed(): State {
   return {
-    schema: 2,
+    schema: 5,
     points: structuredClone(points),
     maps: [
       {
@@ -197,6 +214,7 @@ export function seed(): State {
         points: ["P001", "P002", "P003"],
         priority: "普通",
         end: "返航",
+        state: "启用",
         version: 1,
       },
     ],
@@ -238,6 +256,47 @@ export function seed(): State {
         requiredMobility: ["爬楼"],
       },
       task("T014", "二号机器人版本更新后巡检", "已分配", "R02"),
+      // ── 演示用：已结束任务，供「执行回溯」列表展示 ──
+      {
+        ...task("T020", "罐区早班综合巡检", "完成", "R01"),
+        startedAt: dueIn(-180),
+        finishedAt: dueIn(-150),
+        items: points.map((p) => ({ ...p, mapVersion: 3, pointSet: 7 })),
+        done: points.map((p) => p.id),
+        index: 3,
+      },
+      {
+        ...task("T021", "V001 例行压力检测", "部分完成", "R01"),
+        startedAt: dueIn(-160),
+        finishedAt: dueIn(-140),
+        items: points.map((p) => ({ ...p, mapVersion: 3, pointSet: 7 })),
+        done: ["P001"],
+        skipped: ["P002"],
+        index: 2,
+        failure: "P002 出口阀门不可达",
+      },
+      {
+        ...task("T022", "装置区红外测温巡检", "失败", "R02"),
+        startedAt: dueIn(-200),
+        finishedAt: dueIn(-170),
+        items: [{ ...points[2], mapVersion: 3, pointSet: 7 }],
+        skipped: ["P003"],
+        index: 1,
+        failure: "红外传感器异常",
+      },
+      {
+        ...task("T023", "罐区阀门紧急复核", "取消", "R01"),
+        startedAt: dueIn(-90),
+        finishedAt: dueIn(-80),
+        items: [{ ...points[1], mapVersion: 3, pointSet: 7 }],
+        index: 1,
+      },
+      {
+        ...task("T024", "罐区夜间补充巡检", "超期", "R02"),
+        deadline: dueIn(-30),
+        items: points.map((p) => ({ ...p, mapVersion: 3, pointSet: 7 })),
+        index: 0,
+      },
     ],
     results: [
       {
@@ -290,6 +349,152 @@ export function seed(): State {
         action: "任务开始",
         object: "T009",
         detail: "R01 接收目标清单，已核对 m3 / p7",
+      },
+      // T020 完成
+      {
+        id: "L020",
+        time: dueIn(-180),
+        action: "DISPATCH",
+        object: "T020",
+        detail: "T020 下发至 R01，已核对 m3 / p7",
+      },
+      {
+        id: "L021",
+        time: dueIn(-178),
+        action: "START",
+        object: "T020",
+        detail: "R01 开始执行罐区早班综合巡检",
+      },
+      {
+        id: "L022",
+        time: dueIn(-162),
+        action: "TICK",
+        object: "T020",
+        detail: "完成 P001 出口压力表采集，读数正常",
+        reading: "压力 1.62 MPa（正常阈值 0.2–0.8）",
+        image: photo("P001 出口压力表 1.62MPa", 205),
+      },
+      {
+        id: "L023",
+        time: dueIn(-155),
+        action: "TICK",
+        object: "T020",
+        detail: "完成 P002 阀门、P003 罐壁温度采集",
+        reading: "P002 阀位 全关 · P003 罐壁温度 38.5℃",
+        image: photo("P002 阀门 / P003 罐壁现场", 140),
+      },
+      {
+        id: "L024",
+        time: dueIn(-150),
+        action: "TASK_FINISHED",
+        object: "T020",
+        detail: "全部检测项完成，任务正常结束",
+      },
+      // T021 部分完成
+      {
+        id: "L025",
+        time: dueIn(-160),
+        action: "DISPATCH",
+        object: "T021",
+        detail: "T021 下发至 R01",
+      },
+      {
+        id: "L026",
+        time: dueIn(-158),
+        action: "START",
+        object: "T021",
+        detail: "R01 开始执行 V001 例行压力检测",
+      },
+      {
+        id: "L027",
+        time: dueIn(-150),
+        action: "FAIL",
+        object: "T021",
+        detail: "P002 出口阀门不可达，已重试 2 次仍失败",
+        reading: "重试 2 次：阀门无开度反馈",
+        image: photo("P002 阀门不可达现场", 8),
+      },
+      {
+        id: "L028",
+        time: dueIn(-148),
+        action: "SKIP",
+        object: "T021",
+        detail: "跳过 P002，继续后续检测项",
+      },
+      {
+        id: "L029",
+        time: dueIn(-140),
+        action: "TASK_FINISHED",
+        object: "T021",
+        detail: "部分检测项完成，P002 失败未形成有效结果",
+      },
+      // T022 失败
+      {
+        id: "L030",
+        time: dueIn(-200),
+        action: "DISPATCH",
+        object: "T022",
+        detail: "T022 下发至 R02",
+      },
+      {
+        id: "L031",
+        time: dueIn(-198),
+        action: "START",
+        object: "T022",
+        detail: "R02 开始执行装置区红外测温巡检",
+      },
+      {
+        id: "L032",
+        time: dueIn(-175),
+        action: "FAIL",
+        object: "T022",
+        detail: "红外传感器异常，无法生成热像",
+        reading: "热像缺失：传感器无信号",
+        image: photo("红外传感器异常", 0),
+      },
+      {
+        id: "L033",
+        time: dueIn(-170),
+        action: "STOP",
+        object: "T022",
+        detail: "连续失败，任务被强制终止",
+      },
+      // T023 取消
+      {
+        id: "L034",
+        time: dueIn(-90),
+        action: "DISPATCH",
+        object: "T023",
+        detail: "T023 下发至 R01",
+      },
+      {
+        id: "L035",
+        time: dueIn(-88),
+        action: "START",
+        object: "T023",
+        detail: "R01 开始执行罐区阀门紧急复核",
+      },
+      {
+        id: "L036",
+        time: dueIn(-80),
+        action: "STOP",
+        object: "T023",
+        detail: "人工确认现场无需复核，取消任务",
+      },
+      // T024 超期
+      {
+        id: "L037",
+        time: dueIn(-45),
+        action: "ASSIGN",
+        object: "T024",
+        detail: "T024 分配至 R02 待执行队列",
+      },
+      {
+        id: "L038",
+        time: dueIn(-40),
+        action: "DISPATCH",
+        object: "T024",
+        detail: "T024 已下发，等待 R02 接收",
       },
     ],
     requests: [],

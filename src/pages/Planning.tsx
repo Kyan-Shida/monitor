@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useStore } from "../data/store";
 import { go, useViewState } from "../data/navigation";
 import { Btn, Badge, Panel, Field, Table, Note, Modal } from "../components/UI";
+import { Pager } from "../components/Business";
+import { fmtTime } from "../data/selectors";
 export function Planning({ page, id }: { page: string; id?: string }) {
   const { s, act } = useStore();
   const initial = s.plans.find((p) => p.id === id);
@@ -10,11 +12,20 @@ export function Planning({ page, id }: { page: string; id?: string }) {
     [name, N] = useState(initial?.name || ""),
     [selected, SE] = useState<string[]>(s.templates[0].points),
     [priority, PR] = useState("普通"),
+    [tstate, TS] = useState<"启用" | "停用">("启用"),
+    [tplOpen, setTplOpen] = useState(false),
+    [pickQuery, PQ] = useState(""),
+    [pickPage, PP] = useState(1),
     [cycle, CY] = useState(initial?.cycle || "每天"),
     [start, ST] = useState(initial?.start || "2026-09-22"),
     [end, EN] = useState(initial?.end || "2026-12-31"),
     [time, TM] = useState(initial?.time || "10:00"),
     [query, Q] = useViewState("planning." + page + ".query", ""),
+    [srcFilter, SF] = useViewState<string>("planning.tasks.srcFilter", "全部"),
+    [prioFilter, PF] = useViewState<string>("planning.tasks.prioFilter", "全部"),
+    [statusFilter, STF] = useViewState<string>("planning.tasks.statusFilter", "全部"),
+    [robotFilter, RF] = useViewState<string>("planning.tasks.robotFilter", "全部"),
+    [srcPage, SP] = useState(1),
     [quickOpen, setQuickOpen] = useState(false),
     [planOpen, setPlanOpen] = useState(false),
     [planEditingId, setPlanEditingId] = useState<string | undefined>();
@@ -53,77 +64,134 @@ export function Planning({ page, id }: { page: string; id?: string }) {
         ? selected.filter((x) => x !== id)
         : [...selected, id],
     );
-  const picker = (
-    <Panel title="巡检业务目标与检测要求">
-      <Table
-        heads={["选择", "业务点位", "检测项", "质量要求", "版本 / 状态"]}
-        rows={s.points.map((p) => [
-          <input
-            type="checkbox"
-            checked={selected.includes(p.id)}
-            onChange={() => toggle(p.id)}
-          />,
-          p.name,
-          p.item,
-          p.requirement,
-          <>
-            <span>v{p.version} </span>
-            <Badge>{p.state}</Badge>
-          </>,
-        ])}
-      />
-    </Panel>
+  /**
+   * 已配置巡检点勾选表（数据源 s.points 来自"巡检点列表"页面，平台预先配置好）
+   * 模板/临时任务直接勾选即可，用户无需自己输入检测项
+   */
+  const pickerTable = (
+    <Table
+      heads={["选择", "业务点位", "检测项", "质量要求", "版本 / 状态"]}
+      rows={s.points.map((p) => [
+        <input
+          type="checkbox"
+          checked={selected.includes(p.id)}
+          onChange={() => toggle(p.id)}
+        />,
+        p.name,
+        p.item,
+        p.requirement,
+        <>
+          <span>v{p.version} </span>
+          <Badge>{p.state}</Badge>
+        </>,
+      ])}
+    />
   );
-  if (page === "templates")
+  if (page === "templates") {
+    const editing = s.templates.find((x) => x.id === templateEdit);
+    /** 打开新建弹窗：清空表单为默认值 */
+    const openNew = () => {
+      TE(undefined);
+      N("");
+      SE([]);
+      PR("普通");
+      TS("启用");
+      setTplOpen(true);
+    };
+    /** 打开编辑弹窗：载入模板当前值 */
+    const openEdit = (t: (typeof s.templates)[number]) => {
+      TE(t.id);
+      N(t.name);
+      SE(t.points);
+      PR(t.priority);
+      TS(t.state);
+      setTplOpen(true);
+    };
+    const closeTpl = () => setTplOpen(false);
+    const removeTemplate = (tid: string) => {
+      if (!window.confirm("确认删除该巡检模板？删除后不可恢复。")) return;
+      if (act({ type: "DELETE_TEMPLATE", id: tid }) && templateEdit === tid)
+        closeTpl();
+    };
+    const saveTemplate = () => {
+      if (
+        act({
+          type: "SAVE_TEMPLATE",
+          id: templateEdit,
+          name,
+          points: selected,
+          priority,
+          state: tstate,
+          end: "返航",
+        })
+      )
+        closeTpl();
+    };
     return (
-      <div className="grid template-layout">
-        <Panel title="巡检模板">
-          <Btn
-            onClick={() => {
-              TE(undefined);
-              N("");
-              SE([]);
-            }}
-          >
-            ＋ 新建模板
-          </Btn>
-          {s.templates.map((t) => (
-            <button
-              className="record-button"
-              key={t.id}
-              onClick={() => {
-                TE(t.id);
-                N(t.name);
-                SE(t.points);
-                PR(t.priority);
-              }}
-            >
-              <b>{t.name}</b>
-              <small>
-                {t.id} · v{t.version} · {t.points.length} 个目标
-              </small>
-            </button>
-          ))}
-        </Panel>
-        <div>
-          <Panel
-            title="模板业务要求"
-            extra={
-              <Btn
-                primary
-                onClick={() =>
-                  act({
-                    type: "SAVE_TEMPLATE",
-                    id: templateEdit,
-                    name,
-                    points: selected,
-                    priority,
-                  })
+      <>
+        <Panel
+          title="巡检模板"
+          extra={
+            <>
+              <span className="head-hint">
+                组合巡检点位与业务要求，供巡检计划 / 临时任务引用
+              </span>
+              <div className="actions">
+                <Btn primary onClick={openNew}>
+                  ＋ 新建模板
+                </Btn>
+              </div>
+            </>
+          }
+        >
+          <Table
+            heads={["模板 / 编号", "优先级", "巡检点", "版本", "状态", "操作"]}
+            rows={s.templates.map((t) => [
+              <>
+                <b>{t.name}</b>
+                <small className="cell-muted">{t.id}</small>
+              </>,
+              <span
+                className={
+                  "badge " +
+                  (t.priority === "紧急"
+                    ? "red"
+                    : t.priority === "高"
+                      ? "amber"
+                      : "")
                 }
               >
-                保存模板
-              </Btn>
+                {t.priority}
+              </span>,
+              `${t.points.length} 个`,
+              <span className="ver">v{t.version}</span>,
+              <span className={"badge " + (t.state === "启用" ? "green" : "")}>
+                {t.state}
+              </span>,
+              <div className="actions">
+                <Btn onClick={() => openEdit(t)}>编辑</Btn>
+                <Btn
+                  onClick={() =>
+                    act({ type: "TOGGLE_TEMPLATE_STATE", id: t.id })
+                  }
+                >
+                  {t.state === "启用" ? "停用" : "启用"}
+                </Btn>
+                <Btn danger onClick={() => removeTemplate(t.id)}>
+                  删除
+                </Btn>
+              </div>,
+            ])}
+          />
+        </Panel>
+        {tplOpen && (
+          <Modal
+            title={
+              editing
+                ? `编辑模板 · ${editing.id} · v${editing.version}`
+                : "新建模板"
             }
+            onClose={closeTpl}
           >
             <div className="form-grid">
               <Field label="模板名称">
@@ -140,28 +208,34 @@ export function Planning({ page, id }: { page: string; id?: string }) {
                   <option>紧急</option>
                 </select>
               </Field>
+              <Field label="状态">
+                <select
+                  value={tstate}
+                  onChange={(e) => TS(e.target.value as "启用" | "停用")}
+                >
+                  <option>启用</option>
+                  <option>停用</option>
+                </select>
+              </Field>
               <Field label="结束动作">
                 <input readOnly value="返航" />
               </Field>
             </div>
             <Note>
-              模板组合业务目标和检测要求；机器人自主选择观察位置并执行采集。
+              巡检点从平台已配置的"巡检点列表"中勾选；机器人自主选择观察位置并执行采集。保存即生成新版本；停用的模板不参与计划生成；已被计划引用的模板不可删除。
             </Note>
-          </Panel>
-          {picker}
-          <Btn
-            primary
-            onClick={() => {
-              resetPlanForm();
-              setPlanEditingId(undefined);
-              setPlanOpen(true);
-            }}
-          >
-            创建巡检计划 →
-          </Btn>
-        </div>
-      </div>
+            {pickerTable}
+            <div className="modal-actions">
+              <Btn onClick={closeTpl}>取消</Btn>
+              <Btn primary onClick={saveTemplate}>
+                保存模板
+              </Btn>
+            </div>
+          </Modal>
+        )}
+      </>
     );
+  }
   if (page === "plans")
     return (
       <>
@@ -183,8 +257,8 @@ export function Planning({ page, id }: { page: string; id?: string }) {
           <Table
             heads={[
               "计划名称",
-              "模板",
-              "周期 / 时间（自动下发计划任务）",
+              "模板（注：通过模板，实现计划/任务复用）",
+              "周期 / 时间（注：自动下发计划任务）",
               "有效期",
               "版本 / 状态",
               "操作",
@@ -213,7 +287,7 @@ export function Planning({ page, id }: { page: string; id?: string }) {
                     if (act({ type: "GENERATE", id: p.id })) go("tasks");
                   }}
                 >
-                  模拟到点下发计划任务
+                  模拟自动下发计划任务
                 </Btn>
               </div>,
             ])}
@@ -355,7 +429,7 @@ export function Planning({ page, id }: { page: string; id?: string }) {
   if (page === "quick")
     return (
       <>
-        {picker}
+        {pickerTable}
         <Btn
           primary
           onClick={() => {
@@ -375,16 +449,110 @@ export function Planning({ page, id }: { page: string; id?: string }) {
       </>
     );
   const t = s.tasks.find((t) => t.id === id);
+  /** 任务列表：搜索词 + 来源/优先级/状态/机器人四字段筛选 + 分页（每页 5 条） */
+  const TASK_PAGE_SIZE = 5;
+  /** 从任务数据动态派生下拉选项，避免硬编码与种子数据不同步 */
+  const sourceOpts = ["全部", ...new Set(s.tasks.map((x) => x.source))];
+  const prioOpts = [
+    "全部",
+    ...new Set(s.tasks.map((x) => x.priority || "普通")),
+  ];
+  const statusOpts = ["全部", ...new Set(s.tasks.map((x) => x.state))];
+  const robotOpts = [
+    "全部",
+    "未分配",
+    ...new Set(s.tasks.map((x) => x.robotId).filter(Boolean)),
+  ];
+  const allFiltered = s.tasks.filter((t) => {
+    if ((t.name + t.id).includes(query) === false) return false;
+    if (srcFilter !== "全部" && t.source !== srcFilter) return false;
+    if (prioFilter !== "全部" && (t.priority || "普通") !== prioFilter)
+      return false;
+    if (statusFilter !== "全部" && t.state !== statusFilter) return false;
+    if (
+      robotFilter !== "全部" &&
+      (t.robotId || "未分配") !== robotFilter
+    )
+      return false;
+    return true;
+  });
+  const pageMax = Math.max(1, Math.ceil(allFiltered.length / TASK_PAGE_SIZE));
+  const curPage = Math.min(srcPage, pageMax);
+  const pageRows = allFiltered.slice(
+    (curPage - 1) * TASK_PAGE_SIZE,
+    curPage * TASK_PAGE_SIZE,
+  );
+  /** 筛选器统一切换回第一页 */
+  const resetPage = () => SP(1);
   return (
     <>
       <Panel
-        title="任务实例（基于计划自动生成 or 手动下发临时任务）"
+        title="任务列表"
         extra={
           <div className="actions">
+            <label className="inline-filter">
+              <span>来源：</span>
+              <select
+                value={srcFilter}
+                onChange={(e) => {
+                  SF(e.target.value);
+                  resetPage();
+                }}
+              >
+                {sourceOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inline-filter">
+              <span>优先级：</span>
+              <select
+                value={prioFilter}
+                onChange={(e) => {
+                  PF(e.target.value);
+                  resetPage();
+                }}
+              >
+                {prioOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inline-filter">
+              <span>状态：</span>
+              <select
+                value={statusFilter}
+                onChange={(e) => {
+                  STF(e.target.value);
+                  resetPage();
+                }}
+              >
+                {statusOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inline-filter">
+              <span>机器人：</span>
+              <select
+                value={robotFilter}
+                onChange={(e) => {
+                  RF(e.target.value);
+                  resetPage();
+                }}
+              >
+                {robotOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
             <input
               placeholder="搜索任务名称 / 编号"
               value={query}
-              onChange={(e) => Q(e.target.value)}
+              onChange={(e) => {
+                Q(e.target.value);
+                resetPage();
+              }}
             />
             <Btn primary onClick={() => setQuickOpen(true)}>
               ＋ 临时巡检任务
@@ -393,37 +561,55 @@ export function Planning({ page, id }: { page: string; id?: string }) {
         }
       >
         <Table
-          heads={["任务 / 来源", "状态", "机器人", "版本快照", "完成", "操作"]}
-          rows={s.tasks
-            .filter((t) => (t.name + t.id).includes(query))
-            .map((t) => [
-              <b>
-                {t.name}
-                <small>
-                  {t.id} · {t.source}
-                </small>
-              </b>,
-              <Badge>{t.state}</Badge>,
-              t.robotId || "未分配",
-              `m${t.mapVersion} / p${t.pointSet}`,
-              `${t.done.length}/${t.items.length}`,
-              <div className="actions">
-                <Btn onClick={() => go("tasks", t.id)}>详情</Btn>
-                <Btn
-                  onClick={() =>
-                    go(
-                      ["执行中", "暂停", "待执行"].includes(t.state)
-                        ? "execution"
-                        : "dispatch",
-                      t.id,
-                    )
-                  }
-                >
-                  进入工作台
-                </Btn>
-              </div>,
-            ])}
+          heads={[
+            "任务 / 来源",
+            "优先级",
+            "状态",
+            "机器人",
+            "版本快照",
+            "完成",
+            "时间（生成 / 结束）",
+            "操作",
+          ]}
+          rows={pageRows.map((t) => [
+            <b>
+              {t.name}
+              <small>
+                {t.id} · {t.source}
+              </small>
+            </b>,
+            <span
+              className={
+                "badge " +
+                (t.priority === "紧急" ? "red" : t.priority === "高" ? "amber" : "")
+              }
+            >
+              {t.priority || "普通"}
+            </span>,
+            <Badge>{t.state}</Badge>,
+            t.robotId || "未分配",
+            `m${t.mapVersion} / p${t.pointSet}`,
+            `${t.done.length}/${t.items.length}`,
+            <>
+              <span>{fmtTime(t.created)}</span>
+              <small className="cell-muted">
+                {t.finishedAt ? `结束 ${fmtTime(t.finishedAt)}` : "尚未结束"}
+              </small>
+            </>,
+            <div className="actions">
+              <Btn onClick={() => go("tasks", t.id)}>详情</Btn>
+            </div>,
+          ])}
         />
+        <Pager
+          page={curPage}
+          count={allFiltered.length}
+          size={TASK_PAGE_SIZE}
+          onChange={(n) => SP(n)}
+        />
+        <Note>
+          任务来源分两类：计划自动生成（周期计划到点下发）与人工临时下发；优先级为紧急 / 高的任务建议优先派单。
+        </Note>
       </Panel>
       {t && (
         <Panel title={`${t.name} · 不可变任务快照`}>
@@ -479,7 +665,7 @@ export function Planning({ page, id }: { page: string; id?: string }) {
               </select>
             </Field>
           </div>
-          {picker}
+          {pickerTable}
           <div className="modal-actions">
             <Btn onClick={() => setQuickOpen(false)}>取消</Btn>
             <Btn

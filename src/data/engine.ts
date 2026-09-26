@@ -434,12 +434,31 @@ export function transition(state: State, a: Action): State {
         points: a.points,
         priority: a.priority || "普通",
         end: a.end || "返航",
+        state: a.state || old?.state || "启用",
         version: (old?.version || 0) + 1,
       };
       s.templates = old
         ? s.templates.map((x) => (x.id === old.id ? t : x))
         : [t, ...s.templates];
       object = t.id;
+      break;
+    }
+    case "TOGGLE_TEMPLATE_STATE": {
+      const t = s.templates.find((x) => x.id === a.id);
+      must(t, "模板不存在或已删除");
+      if (t.state === "启用") {
+        const used = s.plans.filter((p) => p.templateId === a.id && p.state === "启用");
+        must(used.length === 0, "该模板仍有启用的计划引用，请先停用相关计划");
+      }
+      t.state = t.state === "启用" ? "停用" : "启用";
+      break;
+    }
+    case "DELETE_TEMPLATE": {
+      const t = s.templates.find((x) => x.id === a.id);
+      must(t, "模板不存在或已删除");
+      const used = s.plans.filter((p) => p.templateId === a.id);
+      must(used.length === 0, "该模板已被巡检计划引用，请先解除引用再删除");
+      s.templates = s.templates.filter((x) => x.id !== a.id);
       break;
     }
     case "SAVE_PLAN": {
@@ -542,6 +561,60 @@ export function transition(state: State, a: Action): State {
       const t = task();
       must(t.state === "下发中", "当前没有待确认下发");
       t.state = "待执行";
+      break;
+    }
+    case "ENQUEUE": {
+      // 加入队列：一次性把待派单任务分配并下发至机器人预执行队列，机器人空闲则直接开跑
+      const t = task(),
+        r = robot();
+      must(["待调度", "已分配"].includes(t.state), "任务不是待派单状态");
+      const reasons = constraints(s, t, r).filter(
+        (x) => x !== "地图/点位版本待同步",
+      );
+      must(!reasons.length, reasons.join("；"));
+      t.robotId = r.id;
+      t.dispatchId = id("DSP");
+      t.state = "待执行";
+      if (!r.current) {
+        must(
+          !constraints(s, t, r, true).length,
+          constraints(s, t, r, true).join("；"),
+        );
+        t.state = "执行中";
+        t.startedAt ||= new Date().toISOString();
+        r.current = t.id;
+        r.state = "执行中";
+        detail = `${t.id} 已加入 ${r.id} 队列并立即执行`;
+      } else {
+        detail = `${t.id} 已加入 ${r.id} 队列，等待当前任务结束后执行`;
+      }
+      break;
+    }
+    case "DISPATCH_NOW": {
+      // 立即执行：与「加入队列」同一原子链路，仅语义强调即时下发（机器人忙碌时同样回落为排队）
+      const t = task(),
+        r = robot();
+      must(["待调度", "已分配"].includes(t.state), "任务不是待派单状态");
+      const reasons = constraints(s, t, r).filter(
+        (x) => x !== "地图/点位版本待同步",
+      );
+      must(!reasons.length, reasons.join("；"));
+      t.robotId = r.id;
+      t.dispatchId = id("DSP");
+      t.state = "待执行";
+      if (!r.current) {
+        must(
+          !constraints(s, t, r, true).length,
+          constraints(s, t, r, true).join("；"),
+        );
+        t.state = "执行中";
+        t.startedAt ||= new Date().toISOString();
+        r.current = t.id;
+        r.state = "执行中";
+        detail = `${t.id} 已立即下发并由 ${r.id} 执行`;
+      } else {
+        detail = `${t.id} 已下发至 ${r.id}，当前任务结束后续执行`;
+      }
       break;
     }
     case "WITHDRAW": {

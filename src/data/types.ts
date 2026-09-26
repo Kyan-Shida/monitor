@@ -165,6 +165,8 @@ export interface Template {
   points: string[];
   priority: "普通" | "高" | "紧急";
   end: string;
+  /** 模板状态：启用后计划方可引用；停用仅存档不参与生成 */
+  state: "启用" | "停用";
   version: number;
 }
 export interface Plan {
@@ -252,6 +254,10 @@ export interface Log {
   action: string;
   object: string;
   detail: string;
+  /** 采集到的业务读数（如压力 1.62MPa），供证据时间轴展示 */
+  reading?: string;
+  /** 现场证据图片（URL 或 data URI），点击可放大 */
+  image?: string;
 }
 export interface Extra {
   id: string;
@@ -261,8 +267,8 @@ export interface Extra {
   detail: string;
 }
 export interface State {
-  /** 数据模型版本：1 → 2 时新增工单 / 验收 / 接管 / 反馈 / 现场 / 资产等集合 */
-  schema: 2;
+  /** 数据模型版本：1 → 2 新增工单/验收/接管/反馈/现场/资产集合；2 → 3 模板新增 state 字段 */
+  schema: 3;
   maps: MapAsset[];
   points: Point[];
   robots: Robot[];

@@ -45,8 +45,8 @@
 | `tasks` | `#/planning/tasks` | `src/pages/Planning.tsx`（`page="tasks"` 分支） | 任务列表 |
 | `quick` | `#/planning/quick` | `src/pages/Planning.tsx`（`page="quick"` 分支） | 目标与要求（侧边栏已隐藏） |
 | `calendar` | `#/monitor/calendar` | `src/pages/Operations.tsx`（`Legacy` 回退） | 任务日历（侧边栏已隐藏） |
-| `dispatch` | `#/dispatch/workbench` | `src/pages/Scheduling.tsx`（`page="dispatch"` 分支） | 调度工作台 |
-| `queue` | `#/dispatch/queue` | `src/pages/Scheduling.tsx`（`page="queue"` 分支） | 机器人任务队列 |
+| `dispatch` | `#/dispatch/workbench` | `src/pages/Scheduling.tsx`（`page="dispatch"` 分支） | 调度工作台（选任务/选机器人 → 一次派单，含「加入队列/立即执行」方式切换） |
+| `queue` | `#/dispatch/queue` | `src/pages/Scheduling.tsx`（`page="queue"` 分支） | 机器人任务队列（某机器人队列管理：开始/暂停、改派、置于队首、任务抢占、移除出列） |
 | `dispatch-log` | `#/dispatch/records` | 同上，侧边栏已隐藏 | 调度记录 |
 | `execution` | `#/execution/live` | `src/pages/Execution.tsx` | 实时执行监控 |
 | `replay` | `#/execution/replay` | `src/pages/ObjectDetails.tsx`（`page="replay"`） | 执行回溯 |
@@ -138,7 +138,7 @@
 | `Maps.tsx` | — | 地图管理（内部 tab: archive/sync/changes/detail） |
 | `Annotation.tsx` | — | 点位标注工作台 |
 | `Planning.tsx` | `plans` / `plan-edit` / `tasks` / `quick` / `templates` | 计划 + 任务 + 模板统一页面 |
-| `Scheduling.tsx` | `dispatch` / `queue` | 调度工作台（选任务/选机器人 → 下发） |
+| `Scheduling.tsx` | `dispatch` / `queue` | 调度工作台（选任务/选机器人 → 一次派单，原子动作 `ENQUEUE`/`DISPATCH_NOW`）/ 机器人任务队列（仅队列管理动作，无派单按钮） |
 | `Execution.tsx` | — | 实时执行监控 |
 | `Execution.tsx` → `Control` 导出 | — | 远程操控台（云台/速度/暂停） |
 | `Results.tsx` | `results` / `review` | 巡检结果查询 + 复核 |

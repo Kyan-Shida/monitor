@@ -69,6 +69,20 @@ export const pointOf = (s: State, r: Result) =>
     ?.items.find((p) => p.id === r.pointId) ||
   s.points.find((p) => p.id === r.pointId);
 export const deviceCode = (name: string) => name.split(" ")[0];
+/**
+ * 把任务 / 结果的时间统一显示为「MM-DD HH:mm」
+ * 兼容两种来源：引擎写入的 `toLocaleString("zh-CN")` 与种子数据的 `2026-09-22 09:00`
+ * @param value 时间字符串，空值或无法解析时返回占位符
+ * @returns 格式化后的时间；无值时返回 "—"
+ */
+export const fmtTime = (value?: string) => {
+  if (!value) return "—";
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) return value;
+  const d = new Date(ts),
+    p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+};
 export const timeAt = (minutes: number) => {
   const d = new Date();
   d.setMinutes(d.getMinutes() + minutes);

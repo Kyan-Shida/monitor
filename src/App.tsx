@@ -46,6 +46,7 @@ import {
   Plug,
   SlidersHorizontal,
   Terminal,
+  ArrowLeft,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -55,6 +56,9 @@ import {
   href,
   parse,
   routeMeta,
+  menuIdOf,
+  back,
+  parentTargetOf,
 } from "./data/navigation";
 import { useStore } from "./data/store";
 import { canSee, roleOf, roles } from "./data/roles";
@@ -173,6 +177,16 @@ export default function App() {
   }, []);
   const meta = routeMeta.find((p) => p.id === route.page) || routeMeta[0];
   const { page, id, tab } = route;
+  /** 侧边栏高亮目标：详情页回落到其列表页，避免选中态丢失 */
+  const activeId = menuIdOf(page);
+  /**
+   * 返回目标：按导航目录层级逐级向上（内置详情页 → 二级列表页即终点），
+   * 不依赖点击历史；已到终点时为空，按钮置灰
+   */
+  const backTarget = parentTargetOf(page);
+  const backName = backTarget
+    ? routeMeta.find((x) => x.id === backTarget)?.name || backTarget
+    : "";
   // 驾驶舱大屏：独立窗口形态，不套用后台外壳（侧边栏 / 顶栏 / 中心 Tab）
   if (page === "bigscreen") return <CockpitScreen />;
   /** 权限守卫：页面不在当前角色可见范围时不渲染内容 */
@@ -251,6 +265,7 @@ export default function App() {
             if (!pages.length) return null;
             const isExpanded = search || expanded.has(groupName);
             // 按 sub 标签把页面分组；无子分组的页面归入 "__flat__"
+            // （Map 保持首次出现的顺序，子分组按 navigation.ts 的业务声明顺序呈现）
             const bySub = new Map<string, typeof pages>();
             for (const p of pages) {
               const key = p.sub || "__flat__";
@@ -260,9 +275,10 @@ export default function App() {
             }
             // 搜索过滤
             const flatPages = bySub.get("__flat__") || [];
-            const subGroups = [...bySub.entries()]
-              .filter(([k]) => k !== "__flat__")
-              .sort((a, b) => a[0].localeCompare(b[0]));
+            // 不做字典排序：保持 navigation.ts 中的业务声明顺序（标准与模板 → 任务与计划 → 调度 → 执行）
+            const subGroups = [...bySub.entries()].filter(
+              ([k]) => k !== "__flat__",
+            );
             const searchHit = (p: (typeof pages)[0]) =>
               p.name.includes(search) || kwHits.includes(p.id);
             const anyHit =
@@ -308,7 +324,7 @@ export default function App() {
                     {/* 无子分组的页面直接平铺 */}
                     {flatPages.map((p) => {
                       if (search && !searchHit(p)) return null;
-                      const active = p.id === route.page;
+                      const active = p.id === activeId;
                       const LeafIcon = pageIcons[p.id];
                       return (
                         <button
@@ -347,7 +363,7 @@ export default function App() {
                           </button>
                           {!collapsed &&
                             filtered.map((p) => {
-                              const active = p.id === route.page;
+                              const active = p.id === activeId;
                               const LeafIcon = pageIcons[p.id];
                               return (
                                 <button
@@ -390,6 +406,15 @@ export default function App() {
       </aside>
       <div className="workspace">
         <header>
+          <button
+            className="back-btn"
+            title={backTarget ? `返回：${backName}` : "已在顶层页面"}
+            disabled={!backTarget}
+            onClick={() => back()}
+          >
+            <ArrowLeft size={15} />
+            返回
+          </button>
           <div className="breadcrumb">
             {/* 首页入口：可点击回到角色工作台 */}
             <a

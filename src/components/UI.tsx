@@ -104,17 +104,20 @@ export function Modal({
   title,
   children,
   onClose,
+  wide = false,
 }: {
   title: string;
   children: ReactNode;
   onClose: () => void;
+  /** 宽版弹窗：列数较多的表格（如对象与检测项）使用，避免挤压换行 */
+  wide?: boolean;
 }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div
         role="dialog"
         aria-label={title}
-        className="modal"
+        className={"modal" + (wide ? " wide" : "")}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="panel-head">

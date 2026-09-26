@@ -176,6 +176,7 @@ export function Results({ page, id }: { page: string; id?: string }) {
         <ObjectLink type="task-detail" id={r.taskId} />
         <ObjectLink type="robot" id={t?.robotId} />
         <Badge>{r.status}</Badge>
+        <span className="muted">采集 {r.time}</span>
         <Btn onClick={() => go("replay", r.taskId)}>任务过程回放 →</Btn>
       </div>
       <div className="result-workbench">
@@ -205,8 +206,9 @@ export function Results({ page, id }: { page: string; id?: string }) {
             </Note>
           )}
           <p>
-            {r.time} · {r.source}
+            采集时间 <b>{r.time}</b>
           </p>
+          <p>{r.source}</p>
           <small>证据为 Mock 示意；原始采集值独立留存。</small>
         </Panel>
         <Panel title="结果链路 · 原始 → 识别 → 最终">

@@ -5,10 +5,11 @@ import { roleOf } from "./roles";
 import type { State } from "./types";
 const KEY = "inspection-v14-prototype";
 /** 当前数据模型版本，须与 types.ts 的 State.schema 一致 */
-const SCHEMA = 2;
+const SCHEMA = 5;
 /**
  * 老缓存升级：schema 1 → 2 时补齐工单/验收/接管/反馈等新增集合，
- * 并按序回填机型、移动能力、约束、健康度、固件字段，避免页面读到 undefined
+ * 并按序回填机型、移动能力、约束、健康度、固件字段，避免页面读到 undefined；
+ * schema 2 → 3 时补齐 Template.state（启用/停用），否则模板列表状态列会渲染出空徽标
  * @param raw 本地缓存解析出的状态对象
  * @returns 当前版本状态；无法识别时返回 null，由调用方回落到 seed()
  */
@@ -16,16 +17,23 @@ function migrate(raw: unknown): State | null {
   if (!raw || typeof raw !== "object") return null;
   const old = raw as Record<string, any>;
   if (old.schema === SCHEMA) return old as State;
-  if (old.schema === 1) {
+  if (old.schema === 1 || old.schema === 2) {
     const base = seed();
     const merged = { ...base, ...old, schema: SCHEMA } as State;
-    const oldRobots = (old.robots as any[]) || [];
-    merged.robots = oldRobots.length
-      ? oldRobots.map((r, i) => ({
-          ...base.robots[i % base.robots.length],
-          ...r,
-        }))
-      : base.robots;
+    if (old.schema === 1) {
+      const oldRobots = (old.robots as any[]) || [];
+      merged.robots = oldRobots.length
+        ? oldRobots.map((r, i) => ({
+            ...base.robots[i % base.robots.length],
+            ...r,
+          }))
+        : base.robots;
+    }
+    // Template 新增 state 字段：老缓存逐条回填默认值，保留用户已建模板
+    merged.templates = (merged.templates || []).map((t: any) => ({
+      ...t,
+      state: t.state === "停用" ? "停用" : "启用",
+    }));
     return merged;
   }
   return null;

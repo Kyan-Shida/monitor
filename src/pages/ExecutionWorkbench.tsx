@@ -34,9 +34,12 @@ const actionOptions: {
 ];
 export function Execution({ id }: { id?: string }) {
   const { s, act } = useStore();
+  // 执行监控只展示进行中的任务（执行中 + 暂停：暂停属于执行途中，仍需可监控/恢复/接管）
+  const liveStates = ["执行中", "暂停"];
+  const liveTasks = s.tasks.filter((t) => liveStates.includes(t.state));
   const t =
-    s.tasks.find((t) => t.id === id) ||
-    s.tasks.find((t) => t.state === "执行中") ||
+    (id && liveTasks.find((x) => x.id === id)) ||
+    liveTasks[0] ||
     s.tasks[0];
   const r = s.robots.find((r) => r.id === t.robotId),
     p = t.items[t.index];
@@ -63,9 +66,9 @@ export function Execution({ id }: { id?: string }) {
             value={t.id}
             onChange={(e) => go("execution", e.target.value)}
           >
-            {s.tasks.map((t) => (
+            {liveTasks.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.id} · {t.name}
+                {t.id} · {t.name} · {t.state}
               </option>
             ))}
           </select>
@@ -97,26 +100,43 @@ export function Execution({ id }: { id?: string }) {
             {(t.atomicActions || []).join(" / ") || "按检测项执行"}
           </span>
         </div>
-        <Btn onClick={() => go("results", t.id)}>巡检结果 →</Btn>
       </div>
-      <Kpis
-        items={[
-          {
-            label: "任务完成度 · 有效检测项",
-            value: `${t.done.length} / ${t.items.length}`,
-          },
-          { label: "当前自主阶段", value: stageOf(t) },
-          { label: "失败 / 跳过", value: t.skipped.length },
-          {
-            label: "待复核结果",
-            value: results.filter((x) => x.status === "待复核").length,
-          },
-          {
-            label: "异常结果",
-            value: results.filter((x) => x.abnormal).length,
-          },
-        ]}
-      />
+      <div className="execution-kpis">
+        <Kpis
+          items={[
+            {
+              label: "任务完成度",
+              value: `${t.done.length} / ${t.items.length}`,
+              group: "进度",
+              hint: "口径：已完成检测项 / 总检测项",
+            },
+            {
+              label: "当前自主阶段",
+              value: stageOf(t),
+              group: "进度",
+              hint: "口径：机器人当前所处的自主巡检阶段",
+            },
+            {
+              label: "待复核结果",
+              value: results.filter((x) => x.status === "待复核").length,
+              group: "质量",
+              hint: "口径：已上报但仍需人工复核的结果数",
+            },
+            {
+              label: "失败 / 跳过",
+              value: t.skipped.length,
+              group: "风险",
+              hint: "口径：失败或主动跳过、未形成有效结果的检测项",
+            },
+            {
+              label: "异常结果",
+              value: results.filter((x) => x.abnormal).length,
+              group: "风险",
+              hint: "口径：被判为异常、需重点关注的结果数",
+            },
+          ]}
+        />
+      </div>
       <Steps
         items={stages}
         current={terminal.includes(t.state) ? stages.length : t.stage}
@@ -214,6 +234,18 @@ export function Execution({ id }: { id?: string }) {
           </p>
         </Panel>
       </div>
+      {/*
+        执行监控只保留进行中的任务（执行中 / 暂停）。非执行态任务不再出现在监控列表，
+        故不再需要"下一步该做什么"的提示；无进行中任务时给出空态说明。
+      */}
+      {!liveStates.includes(t.state) && (
+        <Note>
+          当前没有执行中或暂停的任务可供监控。任务需在调度台下发、被机器人接收并开始执行后，才会出现在本监控列表。
+          <div className="actions">
+            <Btn onClick={() => go("dispatch")}>前往调度台</Btn>
+          </div>
+        </Note>
+      )}
       <div className="context-bar">
         <b>任务控制</b>
         <Btn
