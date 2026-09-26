@@ -4,6 +4,8 @@
  *              关键点：浏览器在 file:// 协议下会以 CORS 拦截「外链」的 type="module" 脚本，
  *              因此这里把构建产物里的 JS / CSS / 图标全部内联进 index.html；
  *              内联的 module 脚本不产生跨源请求，可在本地直接执行。
+ *              图片等资源同样内联（assetsInlineLimit 调大）：这类资源由脚本以字符串方式引用，
+ *              HTML 标签层面扫不到，若留成独立文件会在 file:// 下 404（表现为图片不显示）。
  *              另：base 必须用相对路径，否则 /assets/... 在 file:// 下会指向盘符根目录。
  * @interaction 用法（在项目根目录执行）：node scripts/export-static.mjs
  *              产出：<项目根>/静态版/index.html 与 使用说明.txt
@@ -17,6 +19,7 @@ import {
   rmSync,
   mkdirSync,
   existsSync,
+  readdirSync,
 } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve, join } from "node:path";
@@ -66,6 +69,10 @@ await build({
     outDir: "dist-static",
     emptyOutDir: true,
     cssCodeSplit: false,
+    // 图片等资源一律内联为 data URI：交付物要「双击 index.html 即可看」，
+    // 而脚本只能扫 HTML 标签里的外链，脚本内部（JS 字符串）引用的资源扫不到，
+    // 留成独立文件就会在 file:// 下 404（表现为吉祥物等图片不显示）
+    assetsInlineLimit: 8 * 1024 * 1024,
   },
 });
 
@@ -147,6 +154,20 @@ for (const u of externals) {
   }
 }
 
+// ── 4.2 兜底：内联脚本里仍被相对路径引用的资源 ──────────────────────
+// 这类引用出现在 JS 字符串里（如 `./assets/xxx.png`），第 4 步只扫 HTML 标签查不到，
+// 故按「文件名是否出现在整份 HTML 中」判断，命中则连目录一起拷贝，避免离线打开时图片 404
+const stageAssets = join(stage, "assets");
+const copiedInJs = [];
+if (existsSync(stageAssets)) {
+  for (const f of readdirSync(stageAssets)) {
+    if (!html.includes(f)) continue;
+    mkdirSync(join(out, "assets"), { recursive: true });
+    cpSync(join(stageAssets, f), join(out, "assets", f));
+    copiedInJs.push(f);
+  }
+}
+
 if (externals.length) {
   console.warn(
     `⚠ 仍有 ${externals.length} 个未内联的外部资源：${externals.join(", ")}\n` +
@@ -154,5 +175,10 @@ if (externals.length) {
   );
 } else {
   console.log("✔ 生成完毕：index.html 已自包含（无任何外链资源）");
+}
+if (copiedInJs.length) {
+  console.warn(
+    `⚠ 脚本内引用的资源未内联，已拷贝到 assets/：${copiedInJs.join(", ")}（图片等资源建议提高 assetsInlineLimit）`,
+  );
 }
 console.log("  交付目录：" + out);

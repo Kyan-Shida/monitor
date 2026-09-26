@@ -26,7 +26,7 @@ import { minutesLeft, pointOf, stageOf, terminal } from "../data/selectors";
 import { DUE_SOON_MS, metricValue } from "../data/metrics";
 import { canSee, roleOf } from "../data/roles";
 import type { KpiTone } from "../components/Business";
-import mascot from "../assets/mascot-robot.png";
+import mascot from "../assets/mascot-robot.jpg";
 
 // 即将超期阈值与低电量门槛统一由指标中心提供，避免工作台与报表出现两套口径
 
