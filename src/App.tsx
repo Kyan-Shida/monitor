@@ -70,6 +70,7 @@ import { Results, Alarms } from "./pages/Results";
 import { Operations } from "./pages/Operations";
 import { Supporting } from "./pages/Supporting";
 import { Btn, Modal, Note } from "./components/UI";
+import { PageTabs } from "./components/PageTabs";
 import { ObjectDetails } from "./pages/ObjectDetails";
 import { DeviceArchive } from "./pages/DeviceArchive";
 import { MonitorCockpit } from "./pages/MonitorCockpit";
@@ -525,6 +526,8 @@ export default function App() {
             </span>
           </div>
         </header>
+        {/* 页签导航：仿浏览器多标签，记录访问过的页面，便于多功能页并存与快速切换 */}
+        <PageTabs route={route} role={role} iconOf={pageIcons} />
         <main>
           {allowed ? (
             <div key={page + "-" + (id || "") + "-" + (tab || "")}>{body}</div>

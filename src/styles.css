@@ -1783,6 +1783,89 @@ footer {
   color: #7b889a;
   font-size: 12px;
 }
+/* KPI 卡片头：图标 + 指标名称一行排列；前缀 .workbench-kpis 提升特异性以覆盖通用 span 规则 */
+.workbench-kpis .kpi-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.workbench-kpis .kpi-ico {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: 7px;
+  background: #e9f1fb;
+  color: var(--blue);
+  font-size: 0;
+}
+/* 名称 span 保持 block，与图标同行靠 flex 对齐 */
+.workbench-kpis .kpi-head > span:last-child {
+  color: #7b889a;
+  font-size: 12px;
+}
+/* ── KPI 横向卡片布局（card）：彩色图标居左，名称 + 核心数值左对齐排列 ── */
+.workbench-kpis .kpi-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  text-align: left;
+}
+.workbench-kpis .kpi-card .kpi-ico {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+}
+.workbench-kpis .kpi-card .kpi-info {
+  min-width: 0;
+}
+.workbench-kpis .kpi-card .kpi-name {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.workbench-kpis .kpi-card .kpi-value {
+  display: block;
+  margin-top: 3px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #3c5068;
+}
+.workbench-kpis .kpi-card .kpi-unit {
+  margin-left: 3px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #7b889a;
+}
+/* 图标色调：按业务语义区分 */
+.workbench-kpis .tone-blue {
+  background: #e8f1fd;
+  color: #2f7bd9;
+}
+.workbench-kpis .tone-green {
+  background: #e5f6ee;
+  color: #2ba471;
+}
+.workbench-kpis .tone-orange {
+  background: #fdf1e2;
+  color: #e08a2e;
+}
+.workbench-kpis .tone-red {
+  background: #fdeaea;
+  color: #e05c5c;
+}
+.workbench-kpis .tone-purple {
+  background: #f0ecfb;
+  color: #7c5cd6;
+}
+.workbench-kpis .tone-gray {
+  background: #eef1f5;
+  color: #5f7185;
+}
 .workbench-kpis b {
   display: block;
   font-size: 23px;
@@ -3719,11 +3802,8 @@ table th {
   flex: none;
 }
 
-/* 看板保持两栏到更窄的宽度：常见笔记本 / 预览宽度下仍是一屏多块的仪表盘，避免过早塌成单栏导致长滚动 */
+/* 窄屏下待办条目改为纵向排布，避免右侧操作区把正文挤成多行 */
 @media (max-width: 960px) {
-  .workbench-board {
-    grid-template-columns: 1fr;
-  }
   .todo-item {
     flex-direction: column;
     align-items: stretch;
@@ -5937,4 +6017,396 @@ table th {
   border-radius: 0;
 }
 /* 两舱切换由统一的大屏全局导航栏承担（见 .cs-nav-tab） */
+
+/* ── 页签导航：仿浏览器多标签，位于顶栏面包屑正下方，支持多功能页并存与快速切换 ── */
+.page-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 22px;
+  background: var(--surface);
+  box-shadow: 0 1px 0 rgba(25, 52, 78, 0.04);
+}
+.page-tabs-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px 0;
+  scrollbar-width: thin;
+}
+/* 页签本体：图标 + 名称 + 关闭按钮；激活态用品牌蓝描边 */
+.page-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: #f7fafc;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  user-select: none;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    background 0.15s;
+}
+.page-tab:hover {
+  color: var(--blue);
+  border-color: #9dc4e8;
+  background: #f4f9ff;
+}
+.page-tab.active {
+  color: var(--blue);
+  border-color: var(--blue);
+  background: #e9f4ff;
+  font-weight: 600;
+}
+.page-tab-icon {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.page-tab-name {
+  max-width: 168px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.page-tab-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 0;
+  border-radius: 3px;
+  padding: 0;
+  background: none;
+  color: inherit;
+  opacity: 0.55;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.page-tab-close:hover {
+  background: rgba(31, 103, 181, 0.14);
+  opacity: 1;
+}
+/* 右侧操作区：折叠菜单（关闭其他 / 全部） */
+.page-tabs-tools {
+  position: relative;
+  flex-shrink: 0;
+}
+.page-tabs-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+}
+.page-tabs-more:hover {
+  color: var(--blue);
+  border-color: var(--blue);
+}
+.page-tabs-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+.page-tabs-menu {
+  position: absolute;
+  right: 0;
+  top: 32px;
+  z-index: 61;
+  min-width: 132px;
+  padding: 5px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  box-shadow: 0 6px 18px rgba(19, 45, 73, 0.12);
+}
+.page-tabs-menu button {
+  display: block;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.page-tabs-menu button:hover {
+  background: #f0f6fc;
+  color: var(--blue);
+}
+@media (max-width: 1180px) {
+  .page-tabs {
+    padding: 5px 14px;
+  }
+  .page-tab-name {
+    max-width: 110px;
+  }
+}
+
+/* ── 工作台顶部：欢迎横幅（3D 形象 + 问候 / 日期）与快捷入口 ── */
+.wb-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 14px;
+}
+/* 左侧欢迎横幅：品牌蓝渐变底，3D 形象圆形头像收在右侧 */
+.wb-hero {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 22px 26px;
+  border-radius: 8px;
+  background: linear-gradient(115deg, #2b6fd4 0%, #1f5cb8 55%, #174a99 100%);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(31, 92, 184, 0.22);
+  overflow: hidden;
+}
+.wb-hero-text {
+  min-width: 0;
+}
+.wb-hero-text h2 {
+  margin: 0 0 7px;
+  font-size: 24px;
+  letter-spacing: 0.5px;
+}
+.wb-hero-text p {
+  margin: 0 0 9px;
+  font-size: 14px;
+  opacity: 0.92;
+}
+.wb-hero-text small {
+  font-size: 13px;
+  opacity: 0.75;
+}
+.wb-hero-avatar {
+  width: 108px;
+  height: 108px;
+  margin-left: auto;
+  flex-shrink: 0;
+  border-radius: 50%;
+  object-fit: cover;
+  object-position: center 24%;
+  background: #fff;
+  border: 3px solid rgba(255, 255, 255, 0.35);
+}
+/* 右侧快捷入口：白卡 + 四宫格，图标块悬浮反色 */
+.wb-shortcuts {
+  padding: 14px 18px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(24, 48, 72, 0.035);
+}
+.wb-sc-title {
+  margin-bottom: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.wb-sc-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+.wb-sc-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 4px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.wb-sc-item:hover {
+  background: #f0f6fc;
+  color: var(--blue);
+}
+.wb-sc-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: #e9f1fb;
+  color: var(--blue);
+  transition:
+    color 0.15s,
+    background 0.15s;
+}
+.wb-sc-item:hover .wb-sc-icon {
+  background: var(--blue);
+  color: #fff;
+}
+@media (max-width: 1180px) {
+  .wb-top {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* ── 工作台整屏填充：根容器撑满 main，子区块间距统一交给 flex gap ── */
+.workbench-root {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* 子区块自带的外下边距交给根容器 gap 统一，避免顶部到 KPI 间距翻倍 */
+.workbench-root .wb-top,
+.workbench-root .workbench-kpis {
+  margin-bottom: 0;
+}
+/* 下方两栏实时面板：等分剩余高度，各自内部滚动 */
+.wb-panels {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.wb-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 1px 3px rgba(24, 48, 72, 0.045);
+  overflow: hidden;
+}
+.wb-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.wb-panel-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 6px 12px 12px;
+}
+.wb-empty {
+  padding: 28px 8px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+/* 实时信息流：进行中任务 / 机器人概览共用 */
+.wb-feed {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.wb-feed-item {
+  padding: 11px 8px;
+  border-bottom: 1px solid #eef2f7;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.wb-feed-item:hover {
+  background: #f4f9ff;
+}
+.wb-feed-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.wb-feed-top b {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.wb-feed-sub {
+  font-size: 12px;
+  color: var(--muted);
+}
+.wb-feed-item small {
+  display: block;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted);
+}
+/* 进行中任务进度条 */
+.wb-progress {
+  height: 6px;
+  margin-top: 8px;
+  border-radius: 4px;
+  background: #eef2f7;
+  overflow: hidden;
+}
+.wb-progress i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #2f7bd9, #5b8fe0);
+}
+/* 机器人状态点：执行中绿 / 空闲灰 / 离线红（带同色微光晕，强化辨识度） */
+.wb-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.wb-dot.run {
+  background: #2ba471;
+  box-shadow: 0 0 0 3px rgba(43, 164, 113, 0.16);
+}
+.wb-dot.idle {
+  background: #9fb0c3;
+  box-shadow: 0 0 0 3px rgba(159, 176, 195, 0.18);
+}
+.wb-dot.off {
+  background: #e05c5c;
+  box-shadow: 0 0 0 3px rgba(224, 92, 92, 0.16);
+}
+.wb-panel-link {
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font-size: 12px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.wb-panel-link:hover {
+  text-decoration: underline;
+}
+@media (max-width: 1180px) {
+  .wb-panels {
+    grid-template-columns: 1fr;
+  }
+}
 

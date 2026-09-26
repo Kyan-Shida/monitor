@@ -45,6 +45,19 @@ function initial() {
     return seed();
   }
 }
+/**
+ * 持久化当前状态到 localStorage
+ * @description 以 file:// 直接打开（离线分发）时，部分浏览器会禁用本地存储并抛错，
+ *              此处必须容错，否则一次写失败就会整页白屏；失败时降级为「仅内存」
+ * @param n 待持久化的状态
+ */
+function persist(n: State) {
+  try {
+    persist(n);
+  } catch {
+    /* 存储不可用：本次浏览改为纯内存态，刷新即回到初始演示数据 */
+  }
+}
 const C = createContext<{
   s: State;
   act: (a: Action, onSuccess?: (s: State) => void) => boolean;
@@ -60,7 +73,7 @@ export function Store({ children }: { children: ReactNode }) {
     try {
       const n = transition(s, a);
       set(n);
-      localStorage.setItem(KEY, JSON.stringify(n));
+      persist(n);
       msg("操作成功 · " + n.logs[0].object);
       setTimeout(() => msg(""), 4000);
       onSuccess?.(n);
@@ -77,7 +90,7 @@ export function Store({ children }: { children: ReactNode }) {
   function setRole(rid: string) {
     const n = { ...s, roleId: rid };
     set(n);
-    localStorage.setItem(KEY, JSON.stringify(n));
+    persist(n);
     msg(`已切换角色：${roleOf(rid).name}（${roleOf(rid).scope}）`);
     setTimeout(() => msg(""), 3000);
   }
@@ -91,7 +104,7 @@ export function Store({ children }: { children: ReactNode }) {
         reset: () => {
           const n = seed();
           set(n);
-          localStorage.setItem(KEY, JSON.stringify(n));
+          persist(n);
           msg("演示数据已重置");
         },
       }}

@@ -367,7 +367,12 @@ export function useViewState<T>(
       set((old) => {
         const next =
           typeof value === "function" ? (value as (x: T) => T)(old) : value;
-        sessionStorage.setItem("view:" + key, JSON.stringify(next));
+        // file:// 离线打开时部分浏览器禁用会话存储，写失败不影响本次浏览
+        try {
+          sessionStorage.setItem("view:" + key, JSON.stringify(next));
+        } catch {
+          /* 忽略存储失败 */
+        }
         return next;
       }),
   ];
