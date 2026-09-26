@@ -3640,6 +3640,14 @@ table th {
 .workbench-board > div {
   min-width: 0;
 }
+/* 面板自带 14px 下外边距，在网格里会与 row-gap 叠加成双倍行距，故网格内清零 */
+.workbench-board .panel {
+  margin-bottom: 0;
+}
+/* 面板数为奇数时让末块通栏，消除最后一行留下的半格空白 */
+.workbench-board > div:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .todo-list {
   display: flex;
   flex-direction: column;
@@ -3711,7 +3719,8 @@ table th {
   flex: none;
 }
 
-@media (max-width: 1180px) {
+/* 看板保持两栏到更窄的宽度：常见笔记本 / 预览宽度下仍是一屏多块的仪表盘，避免过早塌成单栏导致长滚动 */
+@media (max-width: 960px) {
   .workbench-board {
     grid-template-columns: 1fr;
   }
