@@ -54,7 +54,7 @@ export const groups = [
     "manual:人工操作与遥控::机器人能力",
     "device:机型专项::机器人能力",
   ],
-  ["分析与报表", "metrics:指标中心", "analytics:基础分析"],
+  ["分析与报表", "metrics:指标中心", "analytics:基础分析", "report:巡检结果报表::巡检报表"],
   [
     "系统设置",
     "services:能力 / 服务管理::配置中心",
@@ -131,6 +131,7 @@ const paths: Record<string, string> = {
   alarm: "alarms/detail",
   metrics: "analytics/metrics",
   analytics: "analytics/overview",
+  report: "analytics/report",
   media: "media/library",
   integration: "integration/services",
   "interface-log": "integration/logs",

@@ -41,7 +41,8 @@ npx vite build                   # 常规构建 → dist/
 node scripts/export-static.mjs   # 导出「双击即用」的离线单文件 → 静态版/index.html
 ```
 
-- `scripts/export-static.mjs` 会：① 以相对路径 `base` 构建；② 把 JS / CSS / 图标**全部内联**进 `index.html`；③ 自检无残留外链。
+- `scripts/export-static.mjs` 会：① 以相对路径 `base` 构建；② 把 JS / CSS / 图标 / **图片（含吉祥物等 PNG、JPEG）全部内联**进 `index.html`；③ 自检无残留外链。
+- 图片内联依赖 `assetsInlineLimit`（已提到 8 MB）：若留成独立文件，脚本内（JS 字符串）的引用既扫不到也拷不全，`file://` 下会 404 导致图片不显示；脚本另留有兜底，会把仍被脚本引用的资源拷进 `assets/`。
 - 产出物 `静态版/index.html` 为**自包含单文件**，`file://` 下双击即可浏览（避开了浏览器对 `file://` 外链 ES module 的 CORS 拦截）。
 - 分发时建议压缩整个 `静态版` 文件夹后发送（`html` 附件常被 IM / 邮箱拦截）。
 

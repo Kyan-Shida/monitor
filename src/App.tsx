@@ -3,7 +3,7 @@
  * @description 应用外壳：按角色过滤的侧边栏、角色切换器、路由分发与权限守卫
  * @interaction 消费 data/navigation.ts（菜单与路由）、data/store.tsx（状态）、data/roles.ts（权限）
  */
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   LayoutDashboard,
   Workflow,
@@ -46,6 +46,9 @@ import {
   SlidersHorizontal,
   Terminal,
   ArrowLeft,
+  LogOut,
+  Check,
+  FileText,
   type LucideIcon,
 } from "lucide-react";
 import {
@@ -71,6 +74,11 @@ import { Operations } from "./pages/Operations";
 import { Supporting } from "./pages/Supporting";
 import { Btn, Modal, Note } from "./components/UI";
 import { PageTabs } from "./components/PageTabs";
+import {
+  NotificationCenter,
+  noticeMessages,
+  unreadNoticeCount,
+} from "./components/NotificationCenter";
 import { ObjectDetails } from "./pages/ObjectDetails";
 import { DeviceArchive } from "./pages/DeviceArchive";
 import { MonitorCockpit } from "./pages/MonitorCockpit";
@@ -78,6 +86,7 @@ import { DispatchCockpit } from "./pages/DispatchCockpit";
 import { CockpitScreen } from "./pages/CockpitScreen";
 import { Workbench } from "./pages/Workbench";
 import { Metrics } from "./pages/Metrics";
+import { InspectionReport } from "./pages/InspectionReport";
 /** 一级业务中心图标，顺序与 data/navigation 的 groups 一一对应 */
 const icons = [
   LayoutDashboard,
@@ -103,6 +112,7 @@ const pageIcons: Record<string, LucideIcon> = {
   archive: Archive,
   alarms: BellRing,
   metrics: LineChart,
+  report: FileText,
   robots: Bot,
   robot: Bot,
   health: Activity,
@@ -148,9 +158,27 @@ export default function App() {
     /** 展开的一级中心：默认只展开当前所在组 */
     [expanded, SETE] = useState<Set<string>>(() => new Set()),
     /** 收起的二级 sub 分组：空表示全部展开 */
-    [collapsedSubs, SETS] = useState<Set<string>>(() => new Set());
+    [collapsedSubs, SETS] = useState<Set<string>>(() => new Set()),
+    /** 消息中心弹窗：顶栏铃铛点击打开 */
+    [noticeOpen, SETNOTICE] = useState(false),
+    /** 顶栏用户下拉菜单：替代原生角色切换器 */
+    [userMenu, SETUSER] = useState(false),
+    /** 退出登录演示弹窗 */
+    [logoutOpen, SETLOGOUT] = useState(false);
   const { message, reset: resetData, s, setRole } = useStore();
   const role = roleOf(s.roleId);
+  /** 用户菜单容器：点击菜单外区域自动收起 */
+  const userRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!userMenu) return;
+    const fn = (e: MouseEvent) => {
+      if (userRef.current && !userRef.current.contains(e.target as Node)) SETUSER(false);
+    };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, [userMenu]);
+  /** 消息中心未读数：铃铛角标与弹窗列表同口径 */
+  const noticeUnread = unreadNoticeCount(noticeMessages(s));
   // 当前页面所在一级组自动展开（首次进入时）
   useEffect(() => {
     const m = routeMeta.find((p) => p.id === route.page);
@@ -226,6 +254,7 @@ export default function App() {
     body = <Planning page={page} id={id} />;
   else if (["dispatch", "queue"].includes(page))
     body = <Scheduling page={page} id={id} />;
+  else if (page === "report") body = <InspectionReport />;
   else if (page === "execution") body = <Execution id={id} />;
   else if (["results", "review", "result-detail"].includes(page))
     body = <Results page={page} id={id} />;
@@ -503,27 +532,74 @@ export default function App() {
             <button title="重置演示" onClick={() => R(true)}>
               <RotateCcw size={17} />
             </button>
-            <button title="告警" onClick={() => go("alarms")}>
+            {/* 消息中心入口：点击弹出消息中心弹窗（不再直接跳转告警页），铃铛带未读角标 */}
+            <button
+              className="bell-btn"
+              title="消息中心"
+              onClick={() => SETNOTICE(true)}
+            >
               <Bell size={18} />
+              {noticeUnread > 0 && (
+                <i className="bell-badge">{noticeUnread > 99 ? "99+" : noticeUnread}</i>
+              )}
             </button>
-            <span className="role-switch">
-              <select
-                aria-label="切换演示角色"
-                value={role.id}
-                onChange={(e) => {
-                  const next = roleOf(e.target.value);
-                  setRole(next.id);
-                  go(next.landing);
-                }}
+            {/* 用户下拉菜单：头像 + 姓名角色，点击展开角色切换与退出登录（原型阶段代替真实登录） */}
+            <div className="user-menu-wrap" ref={userRef}>
+              <button
+                className={"user-btn" + (userMenu ? " open" : "")}
+                aria-label="用户菜单"
+                onClick={() => SETUSER(!userMenu)}
               >
-                {roles.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.person} · {r.name}
-                  </option>
-                ))}
-              </select>
-              <span className="role-scope">{role.scope}</span>
-            </span>
+                <span className="user-avatar">{role.person.charAt(0)}</span>
+                <span className="user-name">
+                  {role.person}
+                  <small>{role.name}</small>
+                </span>
+                <ChevronDown size={14} />
+              </button>
+              {userMenu && (
+                <div className="user-menu" role="menu">
+                  <div className="user-menu-head">
+                    <span className="user-avatar lg">{role.person.charAt(0)}</span>
+                    <div className="user-menu-info">
+                      <b>{role.person} · {role.name}</b>
+                      <small>数据范围：{role.scope}</small>
+                    </div>
+                  </div>
+                  <div className="user-menu-sep" />
+                  {roles.map((r) => (
+                    <button
+                      key={r.id}
+                      role="menuitem"
+                      className={"user-menu-item" + (r.id === role.id ? " active" : "")}
+                      onClick={() => {
+                        if (r.id !== role.id) {
+                          setRole(r.id);
+                          go(r.landing);
+                        }
+                        SETUSER(false);
+                      }}
+                    >
+                      <ShieldCheck size={15} />
+                      切换为 {r.person}（{r.name}）
+                      {r.id === role.id && <Check size={14} className="user-menu-check" />}
+                    </button>
+                  ))}
+                  <div className="user-menu-sep" />
+                  <button
+                    role="menuitem"
+                    className="user-menu-logout"
+                    onClick={() => {
+                      SETUSER(false);
+                      SETLOGOUT(true);
+                    }}
+                  >
+                    <LogOut size={14} />
+                    退出登录
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </header>
         {/* 页签导航：仿浏览器多标签，记录访问过的页面，便于多功能页并存与快速切换 */}
@@ -546,6 +622,16 @@ export default function App() {
         <div role="status" className="toast">
           {message}
         </div>
+      )}
+      {noticeOpen && <NotificationCenter onClose={() => SETNOTICE(false)} />}
+      {logoutOpen && (
+        <Modal title="退出登录" onClose={() => SETLOGOUT(false)}>
+          <Note>
+            演示环境用「角色切换」代替真实登录，无需退出。如需更换身份，请使用用户菜单中的
+            「切换为…」选项。
+          </Note>
+          <Btn onClick={() => SETLOGOUT(false)}>知道了</Btn>
+        </Modal>
       )}
       {reset && (
         <Modal title="重置演示数据" onClose={() => R(false)}>
