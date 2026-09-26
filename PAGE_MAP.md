@@ -12,6 +12,7 @@
 | 侧边栏菜单结构（一级中心 + 二级叶子） | `src/data/navigation.ts` → `groups` 数组 |
 | 路由 hash 映射（`#/xxx` → page ID） | `src/data/navigation.ts` → `paths` 对象 |
 | 页面父子关系（面包屑链） | `src/data/navigation.ts` → `parents` 对象 |
+| 详情页的动态来源（面包屑/返回按入口归属） | 链接带回 `?from=page/id`；`ObjectLink` 传 `from` 属性，见 `navigation.ts` 的 `Route.from` / `href` / `go` / `back` |
 | 侧边栏隐藏/显示某个页面 | `src/data/navigation.ts` → `hiddenIds` 数组 |
 | 一级中心图标（顺序对齐 groups） | `src/App.tsx` → `icons` 数组 |
 | 二级叶子页面图标（按 page ID） | `src/App.tsx` → `pageIcons` 对象 |
@@ -50,7 +51,6 @@
 | `dispatch-log` | `#/dispatch/records` | 同上，侧边栏已隐藏 | 调度记录 |
 | `execution` | `#/execution/live` | `src/pages/Execution.tsx` | 实时执行监控 |
 | `replay` | `#/execution/replay` | `src/pages/ObjectDetails.tsx`（`page="replay"`） | 执行回溯 |
-| `control` | `#/robots/control` | `src/pages/Execution.tsx`（`Control` 导出） | 远程操控台 |
 
 ### 📊 结果与异常（一级中心）
 
@@ -67,13 +67,13 @@
 
 | 页面 ID | 路由 URL | 组件文件 | 备注 |
 |---------|---------|---------|------|
-| `equipment` | `#/resources/equipment` | `src/components/Business.tsx` 兜底（Supporting） | 设备资源树 |
-| `points` | `#/resources/points` | `src/components/Business.tsx` 兜底（Supporting） | 巡检点列表 |
+| `equipment` | `#/resources/equipment` | `src/pages/Supporting.tsx`（`page="equipment"`） | 设备资源树（区域→设备，只读台账 + 对象下钻；数据源为点位所属设备） |
+| `points` | `#/resources/points` | `src/pages/Supporting.tsx`（`page="points"`） | 巡检点列表（关键词 + 设备/地图/状态筛选 + 分页） |
 | `annotation` | `#/resources/annotation` | `src/pages/Annotation.tsx` | 点位标注工作台 |
 | `routes` | `#/resources/routes` | Supporting 兜底，侧边栏已隐藏 | 路线管理 |
 | `standards` | `#/resources/standards` | Supporting 兜底，侧边栏已隐藏 | 巡检标准 |
 | `templates` | `#/resources/templates` | `src/pages/Planning.tsx`（`page="templates"`） | 巡检模板 |
-| `maps` | `#/robots/maps` | `src/pages/Maps.tsx` | 地图管理，内部 4 个 tab（archive/sync/changes/detail） |
+| `maps` | `#/robots/maps` | `src/pages/Maps.tsx` | 地图管理，内部 5 个 tab（list/detail/archive/sync/changes） |
 
 ### 🤖 机器人管理（一级中心）
 
@@ -83,7 +83,7 @@
 | `robot` | `#/robots/detail/:id` | `src/pages/Operations.tsx`（`page="robot"` 分支） | 机器人运行监测（详情），内部 3 个 tab（monitor/tasks/records） |
 | `health` | `#/robots/health` | `src/pages/Operations.tsx`（`page="health"` 分支） | 能力与健康，顶部带机器人选择器 |
 | `robot-map` | `#/robots/map` | `src/pages/Operations.tsx`（`page="robot-map"` 分支） | 地图与版本，顶部带机器人选择器 |
-| `manual` | `#/robots/manual` | `src/pages/Operations.tsx`（`page="manual"` 分支） | 人工操作与遥控，顶部带机器人选择器 |
+| `manual` | `#/robots/manual` | `src/pages/Operations.tsx`（`page="manual"` 分支） | 人工接管与遥控（顶部机器人选择器 + 内嵌 `ControlConsole`，已与远程操控台合并） |
 | `device` | `#/robots/device` | `src/pages/Operations.tsx`（`page="device"` 分支） | 机型专项，顶部带机器人选择器 |
 
 ### 📈 分析与报表（一级中心）
@@ -143,18 +143,19 @@
 | `Planning.tsx` | `plans` / `plan-edit` / `tasks` / `quick` / `templates` | 计划 + 任务 + 模板统一页面 |
 | `Scheduling.tsx` | `dispatch` / `queue` | 调度工作台（选任务/选机器人 → 一次派单，原子动作 `ENQUEUE`/`DISPATCH_NOW`）/ 机器人任务队列（仅队列管理动作，无派单按钮） |
 | `Execution.tsx` | — | 实时执行监控 |
-| `Execution.tsx` → `Control` 导出 | — | 远程操控台（云台/速度/暂停） |
+| `Execution.tsx` → `ControlConsole` 导出 | — | 人工接管与遥控控制台主体（云台/速度/暂停），内嵌于「人工操作与遥控」页 |
 | `Results.tsx` | `results` / `review` / `result-detail` / `alarm-detail`（`Alarms` 导出含 `alarms` / `alarm` / `alarm-detail`） | 巡检结果查询（按任务分组可折叠）+ 复核 + 结果详情 + 告警详情/复核 |
 | `Alarms.tsx` | `alarms` / `alarm` | 告警事件列表 + 详情 |
 | `DeviceArchive.tsx` | — | 设备巡检档案（内部 tab 切换） |
 | `ObjectDetails.tsx` | `point` / `task-detail` / `replay-detail` / `replay` | 下钻详情复用页 |
+| `Supporting.tsx` | `equipment` / `points` / `standards` / `routes` / `services` / `users` / `settings` / `integration` / `interface-log` / `audit` / `media` / `analytics` | 设备资源页 + 巡检点列表 + 各类配置/日志兜底页 |
 
 ### 组件层（src/components/）
 
 | 文件 | 导出/内容 |
 |------|----------|
 | `UI.tsx` | `Btn` / `Modal` / `Note` / `Panel` / `Table` / `Badge` / `Download` / `Pager` / `ObjectLink` |
-| `Business.tsx` | 业务页面统一外壳（面包屑、tab bar、渲染分发 Supporting） |
+| `Business.tsx` | 通用业务组件（`ObjectLink` / `Kpis` / `EventTimeline` / `Pager`） |
 | `ScreenTopBar.tsx` | 驾驶舱顶栏（品牌/时间/全屏） |
 | `RoleMatrix.tsx` | 角色权限矩阵配置（原型演示用） |
 
@@ -210,7 +211,7 @@ src/
 ├── styles.css                   ← 全局样式（唯一的 CSS 文件）
 ├── components/
 │   ├── UI.tsx                   ← Btn/Modal/Panel/Table/Badge 等基础组件
-│   ├── Business.tsx             ← Supporting 兜底页面（设备资源树/巡检点/角色管理等）
+│   ├── Business.tsx             ← 通用业务组件（ObjectLink / Kpis / 事件时间轴 / Pager）
 │   ├── ScreenTopBar.tsx         ← 驾驶舱顶栏（时间/全屏）
 │   └── RoleMatrix.tsx           ← 权限矩阵演示
 ├── pages/

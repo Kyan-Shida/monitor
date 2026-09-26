@@ -27,7 +27,6 @@ import {
   ListOrdered,
   Activity,
   History,
-  Gamepad2,
   FileSearch,
   Eye,
   Archive,
@@ -66,7 +65,7 @@ import { Maps } from "./pages/Maps";
 import { Annotation } from "./pages/Annotation";
 import { Planning } from "./pages/Planning";
 import { Scheduling } from "./pages/Scheduling";
-import { Execution, Control } from "./pages/Execution";
+import { Execution } from "./pages/Execution";
 import { Results, Alarms } from "./pages/Results";
 import { Operations } from "./pages/Operations";
 import { Supporting } from "./pages/Supporting";
@@ -98,7 +97,6 @@ const pageIcons: Record<string, LucideIcon> = {
   queue: ListOrdered,
   execution: Activity,
   replay: History,
-  control: Gamepad2,
   results: FileSearch,
   review: Eye,
   archive: Archive,
@@ -134,7 +132,7 @@ const keywordPages: Record<string, string[]> = {
   复核: ["review"],
   离线: ["robots"],
   低电量: ["robots"],
-  接管: ["control"],
+  接管: ["manual"],
   工单: ["alarms"],
   验收: ["results"],
   指标: ["metrics"],
@@ -177,13 +175,22 @@ export default function App() {
   }, []);
   const meta = routeMeta.find((p) => p.id === route.page) || routeMeta[0];
   const { page, id, tab } = route;
-  /** 侧边栏高亮目标：详情页回落到其列表页，避免选中态丢失 */
-  const activeId = menuIdOf(page);
   /**
-   * 返回目标：按导航目录层级逐级向上（内置详情页 → 二级列表页即终点），
+   * 显式来源页：同一内置页可由不同业务页进入（如「执行回溯」从设备档案或机器人进入），
+   * 链接带回的 from 决定面包屑归属与返回目标，避免上下文串台
+   */
+  const fromMeta = route.from
+    ? routeMeta.find((x) => x.id === route.from!.page)
+    : undefined;
+  /** 面包屑一级分组：带来源时按来源页所属分组 */
+  const breadcrumbGroup = fromMeta ? fromMeta.group : meta.group;
+  /** 侧边栏高亮目标：详情页回落到其列表页；带来源时按来源页归属 */
+  const activeId = menuIdOf(fromMeta ? fromMeta.id : page);
+  /**
+   * 返回目标：优先回到显式来源页；否则按导航目录层级逐级向上，
    * 不依赖点击历史；已到终点时为空，按钮置灰
    */
-  const backTarget = parentTargetOf(page);
+  const backTarget = fromMeta ? fromMeta.id : parentTargetOf(page);
   const backName = backTarget
     ? routeMeta.find((x) => x.id === backTarget)?.name || backTarget
     : "";
@@ -219,7 +226,6 @@ export default function App() {
   else if (["dispatch", "queue"].includes(page))
     body = <Scheduling page={page} id={id} />;
   else if (page === "execution") body = <Execution id={id} />;
-  else if (page === "control") body = <Control id={id} />;
   else if (["results", "review", "result-detail"].includes(page))
     body = <Results page={page} id={id} />;
   else if (["alarms", "alarm", "alarm-detail"].includes(page))
@@ -429,41 +435,48 @@ export default function App() {
             <ChevronRight size={12} className="bc-sep" />
             {/* 一级分组：可点击跳到该组首个可见页面 */}
             <a
-              href={href(meta.group)}
+              href={href(breadcrumbGroup)}
               onClick={(e) => {
                 e.preventDefault();
                 const first = visiblePages.find(
-                  (p) => p.group === meta.group && !p.parent,
+                  (p) => p.group === breadcrumbGroup && !p.parent,
                 );
                 if (first) go(first.id);
               }}
             >
-              {meta.group}
+              {breadcrumbGroup}
             </a>
-            {/* 父页面链：递归往上，每级可点 */}
+            {/* 父页面链：从显式来源页（或静态父页）递归往上，每级可点 */}
             {(() => {
               const chain: typeof routeMeta = [];
-              let cur: string | undefined = meta.parent;
+              let cur: string | undefined = fromMeta ? fromMeta.id : meta.parent;
               while (cur) {
                 const p = routeMeta.find((x) => x.id === cur);
                 if (!p) break;
                 chain.unshift(p);
                 cur = p.parent;
               }
-              return chain.map((p) => (
-                <Fragment key={p.id}>
-                  <ChevronRight size={12} className="bc-sep" />
-                  <a
-                    href={href(p.id)}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      go(p.id);
-                    }}
-                  >
-                    {p.name}
-                  </a>
-                </Fragment>
-              ));
+              return chain.map((p) => {
+                // 来源页本身是带 id 的详情页（如机器人运行监测）时，链接需带回其 id
+                const pid =
+                  route.from && p.id === route.from.page
+                    ? route.from.id
+                    : undefined;
+                return (
+                  <Fragment key={p.id}>
+                    <ChevronRight size={12} className="bc-sep" />
+                    <a
+                      href={href(p.id, pid)}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        go(p.id, pid);
+                      }}
+                    >
+                      {p.name}
+                    </a>
+                  </Fragment>
+                );
+              });
             })()}
             <ChevronRight size={12} className="bc-sep" />
             {/* 当前页面：高亮不可点 */}

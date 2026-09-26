@@ -93,10 +93,7 @@ export function Maps({ tab = "list", id }: { tab?: string; id?: string }) {
                 m.cloud && m.video ? "点云 + 视频已归档" : "资料待补齐",
                 `${m.targets.length} / ${s.points.filter((p) => p.mapId === m.id).length}`,
                 <Badge>{m.state}</Badge>,
-                <div className="actions">
-                  <Btn onClick={() => go("maps", m.id, "detail")}>详情</Btn>
-                  <Btn onClick={() => go("annotation", m.id)}>业务标注</Btn>
-                </div>,
+                <Btn onClick={() => go("maps", m.id, "detail")}>详情</Btn>,
               ])}
           />
         </Panel>

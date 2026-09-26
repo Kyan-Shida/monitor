@@ -159,7 +159,7 @@ export function DeviceArchive({ id }: { id?: string; tab?: string }) {
         </Panel>
       ) : (
         <Panel
-          className="panel-archive-tasks"
+          className="panel-filters-wrap"
           title="设备巡检任务"
           extra={
             <div className="actions">

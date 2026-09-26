@@ -817,20 +817,6 @@ export function seed(): State {
     requests: [],
     extras: [
       {
-        id: "D001",
-        category: "equipment",
-        name: "V001 原料储罐",
-        status: "启用",
-        detail: "一期罐区 · 压力表 / 出口阀门",
-      },
-      {
-        id: "D002",
-        category: "equipment",
-        name: "V002 缓冲罐",
-        status: "启用",
-        detail: "一期罐区 · 罐壁温度",
-      },
-      {
         id: "STD01",
         category: "standards",
         name: "压力读数标准",

@@ -21,7 +21,7 @@ const drillTarget: Record<string, string> = {
   falseRate: "alarms",
   closeRate: "alarms",
   mttr: "alarms",
-  takeoverRate: "control",
+  takeoverRate: "manual",
   taskRate: "tasks",
   reviewBacklog: "review",
   scheduleRate: "plans",

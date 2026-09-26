@@ -7,6 +7,7 @@ import { ObjectLink, Kpis, EventTimeline, Pager } from "../components/Business";
 import { MapCanvas } from "../components/MapCanvas";
 import { Video } from "../components/Video";
 import { Operations as Legacy } from "./OperationsLegacy";
+import { ControlConsole } from "./Execution";
 import {
   currentTask,
   queueFor,
@@ -14,6 +15,7 @@ import {
   stageOf,
   minutesLeft,
   timeAt,
+  fmtTime,
   schedule,
   robotColors,
   terminal,
@@ -215,9 +217,10 @@ export function Operations({
   // 复用原 robot 详情页 tab 内容，顶部补机器人选择与固定摘要
   if (["health", "robot-map", "manual", "device"].includes(page)) {
     const [selRobot, SR] = useViewState("robot-detail.selected", id);
+    // 路由带回的 id 优先：从其它页面「接管 / 遥控」跳入时锁定该机器人；否则沿用页内选择
     const cur =
-      s.robots.find((x) => x.id === selRobot) ||
       s.robots.find((x) => x.id === id) ||
+      s.robots.find((x) => x.id === selRobot) ||
       s.robots[0];
     if (!cur) return null;
     const common = (
@@ -311,14 +314,10 @@ export function Operations({
       return (
         <>
           {common}
-          <Panel title="受控人工操作入口">
-            <Note>
-              操作/遥控台采用独占会话。自动任务暂停确认后才获得人工遥控权，退出需核对版本与任务断点。
-            </Note>
-            <Btn primary onClick={() => go("control", cur.id)}>
-              进入独立操作 / 遥控台
-            </Btn>
-          </Panel>
+          <Note>
+            人工操作与遥控采用独占会话：自动任务暂停确认后才获得人工遥控权，退出需核对版本与任务断点。
+          </Note>
+          <ControlConsole robotId={cur.id} />
         </>
       );
     if (page === "device")
@@ -450,7 +449,7 @@ export function Operations({
                   disabled={!t}
                   onClick={() => go("execution", t?.id)}
                 >
-                  进入任务执行监控
+                  进入实时执行监控
                 </Btn>
               </section>
             </div>
@@ -464,14 +463,16 @@ export function Operations({
                 <Btn onClick={() => go("queue", r.id)}>管理机器人未来队列</Btn>
               }
             >
+              {/* 与「设备巡检任务」列表同口径（任务 / 来源 / 状态），并保留队列专属的优先级、完成度、预计时段 */}
               <Table
-                heads={["任务", "优先级", "状态", "完成度", "预计时段"]}
+                heads={["任务", "来源", "优先级", "状态", "完成度", "预计时段"]}
                 rows={schedule(s, r)
                   .filter((w) => w.task)
                   .map((w) => [
                     <ObjectLink type="task-detail" id={w.task!.id}>
                       {w.task!.name}
                     </ObjectLink>,
+                    w.task!.source,
                     w.task!.priority,
                     <Badge>{w.task!.state}</Badge>,
                     `${w.task!.done.length}/${w.task!.items.length}`,
@@ -480,8 +481,9 @@ export function Operations({
               />
             </Panel>
             <Panel title="历史任务">
+              {/* 与「设备巡检任务」列表同口径；本页已按机器人限定，故省略「机器人」列 */}
               <Table
-                heads={["任务", "业务状态", "结果 / 回溯"]}
+                heads={["任务", "来源", "状态", "时间（生成 / 结束）", "回放"]}
                 rows={s.tasks
                   .filter(
                     (t) => t.robotId === r.id && terminal.includes(t.state),
@@ -490,9 +492,23 @@ export function Operations({
                     <ObjectLink type="task-detail" id={t.id}>
                       {t.name}
                     </ObjectLink>,
+                    t.source,
                     <Badge>{t.state}</Badge>,
-                    <ObjectLink type="replay" id={t.id}>
-                      执行回溯
+                    <>
+                      <span>{fmtTime(t.created)}</span>
+                      <small className="cell-muted">
+                        {t.finishedAt
+                          ? `结束 ${fmtTime(t.finishedAt)}`
+                          : "尚未结束"}
+                      </small>
+                    </>,
+                    <ObjectLink
+                      type="replay"
+                      id={t.id}
+                      to="replay-detail"
+                      from={{ page: "robot", id: r.id }}
+                    >
+                      过程回放
                     </ObjectLink>,
                   ])}
               />

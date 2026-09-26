@@ -407,15 +407,15 @@ h4 {
   color: #1d2a37;
   min-width: 72px;
 }
-/* 设备巡检任务面板：筛选器较多，允许头部换行，并让日期输入与下拉同风格 */
-.panel-archive-tasks .panel-head {
+/* 筛选器较多的面板（设备巡检任务、巡检点列表）：允许头部换行，并让日期输入与下拉同风格 */
+.panel-filters-wrap .panel-head {
   flex-wrap: wrap;
 }
-.panel-archive-tasks .panel-head > .actions {
+.panel-filters-wrap .panel-head > .actions {
   flex: 1 1 auto;
   min-width: 0;
 }
-.panel-archive-tasks .inline-filter input[type="date"] {
+.panel-filters-wrap .inline-filter input[type="date"] {
   border: 1px solid #dfe6ef;
   background: #fff;
   padding: 3px 6px;

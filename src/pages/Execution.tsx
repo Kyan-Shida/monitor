@@ -8,25 +8,23 @@ import { Video } from "../components/Video";
 import { Can, useRole } from "../components/Can";
 import { PERMS } from "../data/roles";
 export { Execution } from "./ExecutionWorkbench";
-export function Control({ id }: { id?: string }) {
+/**
+ * 人工接管与遥控控制台主体
+ * @description 内嵌于「人工操作与遥控」页；机器人身份由该页页头的选择器确定，故此处不再重复选择器
+ * @param robotId 当前机器人 ID
+ */
+export function ControlConsole({ robotId }: { robotId: string }) {
   const { s, act } = useStore();
   const role = useRole();
-  const r = s.robots.find((r) => r.id === id) || s.robots[0];
+  const r = s.robots.find((x) => x.id === robotId) || s.robots[0];
   const x = s.sessions.find(
-    (x) => x.robotId === r.id && !["已释放", "已超时"].includes(x.state),
+    (y) => y.robotId === r.id && !["已释放", "已超时"].includes(y.state),
   );
-  const t = s.tasks.find((t) => t.id === r.current);
+  const t = s.tasks.find((y) => y.id === r.current);
   const [checked, C] = useState(false);
   return (
     <>
       <div className="context-bar">
-        <select value={r.id} onChange={(e) => go("control", e.target.value)}>
-          {s.robots.map((r) => (
-            <option value={r.id} key={r.id}>
-              {r.id} · {r.name}
-            </option>
-          ))}
-        </select>
         <Badge>{r.state}</Badge>
         <span>
           电量 {r.battery}% · m{r.mapVersion} / p{r.pointSet}
@@ -35,7 +33,10 @@ export function Control({ id }: { id?: string }) {
           <Badge>会话进行中</Badge>
         ) : (
           <Can perm={PERMS.接管申请}>
-            <Btn primary onClick={() => act({ type: "TAKEOVER", robotId: r.id })}>
+            <Btn
+              primary
+              onClick={() => act({ type: "TAKEOVER", robotId: r.id })}
+            >
               申请接管
             </Btn>
           </Can>

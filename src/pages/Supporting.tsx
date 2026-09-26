@@ -1,4 +1,4 @@
-import { ObjectLink } from "../components/Business";
+import { ObjectLink, Pager } from "../components/Business";
 import { useState } from "react";
 import { useStore } from "../data/store";
 import { go, pages, useViewState } from "../data/navigation";
@@ -24,39 +24,47 @@ export function Supporting({ page }: { page: string }) {
     [bid, B] = useState("BIZ-20260922-001"),
     [selected, SEL] = useState(""),
     /** 设备资源页「对象与检测项」弹窗开关：就地查看，不跳转离开当前页 */
-    [objectsOpen, OO] = useState(false);
-  /** 设备 → 对象 → 检测项 表格：objects 页面与设备资源页弹窗共用 */
-  const objectsTable = (
-    <Table
-      heads={[
-        "业务点位",
-        "设备 / 对象",
-        "检测项",
-        "类型 / 单位",
-        "必检",
-        "状态 / 版本",
-        "操作",
-      ]}
-      rows={s.points.map((p) => [
-        <ObjectLink type="point" id={p.id}>
-          {p.name}
-        </ObjectLink>,
-        <>
-          <ObjectLink type="archive" id={p.device.split(" ")[0]}>
-            {p.device}
-          </ObjectLink>
-          <small>{p.object}</small>
-        </>,
-        p.item,
-        `${p.kind} / ${p.unit || "状态"}`,
-        "是",
-        <>
-          <Badge>{p.state}</Badge> v{p.version}
-        </>,
-        <Btn onClick={() => go("annotation", p.mapId)}>编辑标注</Btn>,
-      ])}
-    />
-  );
+    [objectsOpen, OO] = useState(false),
+    /** 「对象与检测项」弹窗对应的设备（统一取自点位所属设备） */
+    [objDevice, OD] = useState(""),
+    /** 设备资源树选中的设备；空串表示全部设备 */
+    [eqSel, ES] = useState(""),
+    [pDev, PD] = useViewState("supporting.points.device", "全部"),
+    [pMap, PM] = useViewState("supporting.points.map", "全部"),
+    [pState, PS] = useViewState("supporting.points.state", "全部"),
+    [pPage, PP] = useViewState("supporting.points.page", 1);
+  /** 点位明细表列头：巡检点列表与设备「对象与检测项」弹窗共用（已去掉无数据来源的「必检」列） */
+  const POINT_HEADS = [
+    "业务点位",
+    "设备 / 对象",
+    "检测项",
+    "类型 / 单位",
+    "状态 / 版本",
+    "操作",
+  ];
+  /**
+   * 把点位数组渲染为表格行
+   * @param list 点位列表
+   * @returns 表格行数组
+   */
+  const pointRows = (list: typeof s.points) =>
+    list.map((p) => [
+      <ObjectLink type="point" id={p.id}>
+        {p.name}
+      </ObjectLink>,
+      <>
+        <ObjectLink type="archive" id={p.device.split(" ")[0]} to="archive">
+          {p.device}
+        </ObjectLink>
+        <small>{p.object}</small>
+      </>,
+      p.item,
+      `${p.kind} / ${p.unit || "状态"}`,
+      <>
+        <Badge>{p.state}</Badge> v{p.version}
+      </>,
+      <Btn onClick={() => go("annotation", p.mapId)}>编辑标注</Btn>,
+    ]);
   // 角色权限矩阵：管理员 / 非管理员 × 权限五要素，替代原通用配置表
   if (page === "roles") return <RoleMatrix />;
   if (["audit", "interface-log", "dispatch-log", "replay"].includes(page)) {
@@ -113,19 +121,206 @@ export function Supporting({ page }: { page: string }) {
       </Panel>
     );
   }
-  if (page === "points" || page === "objects")
+  // 巡检点列表：点位量大，提供关键词 + 设备 / 地图 / 状态筛选与分页
+  if (page === "points") {
+    const deviceOpts = ["全部", ...new Set(s.points.map((p) => p.device))];
+    const mapOpts = ["全部", ...new Set(s.points.map((p) => p.mapId))];
+    const stateOpts = ["全部", ...new Set(s.points.map((p) => p.state))];
+    const kw = q.trim();
+    const list = s.points.filter((p) => {
+      if (kw && !(p.id + p.name + p.device + p.object + p.item).includes(kw))
+        return false;
+      if (pDev !== "全部" && p.device !== pDev) return false;
+      if (pMap !== "全部" && p.mapId !== pMap) return false;
+      if (pState !== "全部" && p.state !== pState) return false;
+      return true;
+    });
+    const size = 10;
+    const pages = Math.max(1, Math.ceil(list.length / size));
+    const cur = Math.min(pPage, pages);
     return (
       <Panel
-        title={page === "points" ? "业务巡检点与版本" : "设备 → 对象 → 检测项"}
+        className="panel-filters-wrap"
+        title="业务巡检点与版本"
         extra={
-          <Btn primary onClick={() => go("annotation")}>
-            业务标注工作台
-          </Btn>
+          <div className="actions">
+            <label className="inline-filter">
+              <span>设备：</span>
+              <select
+                value={pDev}
+                onChange={(e) => {
+                  PD(e.target.value);
+                  PP(1);
+                }}
+              >
+                {deviceOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inline-filter">
+              <span>地图：</span>
+              <select
+                value={pMap}
+                onChange={(e) => {
+                  PM(e.target.value);
+                  PP(1);
+                }}
+              >
+                {mapOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <label className="inline-filter">
+              <span>状态：</span>
+              <select
+                value={pState}
+                onChange={(e) => {
+                  PS(e.target.value);
+                  PP(1);
+                }}
+              >
+                {stateOpts.map((o) => (
+                  <option key={o}>{o}</option>
+                ))}
+              </select>
+            </label>
+            <input
+              placeholder="搜索点位名称 / 编号 / 检测项"
+              value={q}
+              onChange={(e) => {
+                Q(e.target.value);
+                PP(1);
+              }}
+            />
+            <Btn primary onClick={() => go("annotation")}>
+              业务标注工作台
+            </Btn>
+          </div>
         }
       >
-        {objectsTable}
+        <Table
+          heads={POINT_HEADS}
+          rows={pointRows(list.slice((cur - 1) * size, cur * size))}
+        />
+        <Pager page={cur} count={list.length} size={size} onChange={PP} />
       </Panel>
     );
+  }
+  // 设备资源：树与台账统一以「点位所属设备」为唯一数据源，只读浏览 + 对象下钻，不再提供通用配置 CRUD
+  if (page === "equipment") {
+    const devices = [...new Set(s.points.map((p) => p.device))].map(
+      (devName) => {
+        const pts = s.points.filter((p) => p.device === devName);
+        return {
+          code: devName.split(" ")[0],
+          name: devName,
+          region: s.maps.find((m) => m.id === pts[0]?.mapId)?.region || "—",
+          objects: [...new Set(pts.map((p) => p.object))],
+          pointCount: pts.length,
+          enabled: pts.filter((p) => p.state === "已启用").length,
+        };
+      },
+    );
+    const regions = [...new Set(devices.map((d) => d.region))];
+    const kw = q.trim();
+    const rows = devices
+      .filter((d) => !eqSel || d.name === eqSel)
+      .filter((d) => !kw || (d.name + d.code).includes(kw));
+    return (
+      <>
+        <div className="grid template-layout">
+          <Panel
+            title="设备资源树"
+            extra={<Btn onClick={() => ES("")}>全部设备</Btn>}
+          >
+            {/* 层级由数据派生（区域 → 设备），不再写死企业 / 装置 / 罐区三级 */}
+            <div className="resource-tree">
+              {regions.map((rg) => (
+                <div key={rg}>
+                  <div className="rt-node rt-l1">{rg}</div>
+                  {devices
+                    .filter((d) => d.region === rg)
+                    .map((d) => (
+                      <button
+                        key={d.code}
+                        className={
+                          "rt-node rt-l3" + (eqSel === d.name ? " active" : "")
+                        }
+                        onClick={() => ES(d.name)}
+                      >
+                        {d.name}
+                      </button>
+                    ))}
+                </div>
+              ))}
+            </div>
+          </Panel>
+          <Panel
+            title="设备台账"
+            extra={
+              <input
+                placeholder="搜索设备名称 / 编码"
+                value={q}
+                onChange={(e) => Q(e.target.value)}
+              />
+            }
+          >
+            <Table
+              heads={[
+                "设备编码",
+                "设备名称",
+                "所属区域",
+                "关联对象",
+                "关联点位",
+                "点位启用",
+                "操作",
+              ]}
+              rows={rows.map((d) => [
+                d.code,
+                <ObjectLink type="archive" id={d.code} to="archive">
+                  {d.name}
+                </ObjectLink>,
+                d.region,
+                d.objects.join(" / "),
+                `${d.pointCount} 项`,
+                `${d.enabled} / ${d.pointCount}`,
+                <Btn
+                  onClick={() => {
+                    OD(d.name);
+                    OO(true);
+                  }}
+                >
+                  对象与检测项
+                </Btn>,
+              ])}
+            />
+          </Panel>
+        </div>
+        {objectsOpen && (
+          <Modal
+            title={`${objDevice || "全部设备"} · 对象与检测项`}
+            onClose={() => OO(false)}
+            wide
+          >
+            <Table
+              heads={POINT_HEADS}
+              rows={pointRows(
+                s.points.filter((p) => !objDevice || p.device === objDevice),
+              )}
+            />
+            <div className="modal-actions">
+              <Btn onClick={() => OO(false)}>关闭</Btn>
+              <Btn primary onClick={() => go("annotation")}>
+                业务标注工作台
+              </Btn>
+            </div>
+          </Modal>
+        )}
+      </>
+    );
+  }
   if (page === "integration")
     return (
       <>
@@ -343,33 +538,7 @@ export function Supporting({ page }: { page: string }) {
   );
   return (
     <>
-      <div className={page === "equipment" ? "grid template-layout" : ""}>
-        {page === "equipment" && (
-          <Panel
-            title="设备资源层级"
-            extra={<Btn onClick={() => Q("")}>全部设备</Btn>}
-          >
-            {/* 层级用 CSS 缩进 + 字重/颜色表达，替代全角空格，保证各级对齐一致 */}
-            <div className="resource-tree">
-              <div className="rt-node rt-l0">石化企业</div>
-              <div className="rt-node rt-l1">一期装置</div>
-              <div className="rt-node rt-l2">一期罐区</div>
-              {s.extras
-                .filter((x) => x.category === "equipment")
-                .map((x) => (
-                  <button
-                    key={x.id}
-                    className={
-                      "rt-node rt-l3" + (q === x.name ? " active" : "")
-                    }
-                    onClick={() => Q(x.name)}
-                  >
-                    {x.name}
-                  </button>
-                ))}
-            </div>
-          </Panel>
-        )}
+      <div>
         <Panel
           title={pages.find((p) => p.id === page)?.name || page}
           extra={
@@ -397,13 +566,7 @@ export function Supporting({ page }: { page: string }) {
             heads={["编号", "名称", "配置 / 业务范围", "状态", "操作"]}
             rows={extras.map((x) => [
               x.id,
-              page === "equipment" ? (
-                <ObjectLink type="archive" id={x.name.split(" ")[0]}>
-                  {x.name}
-                </ObjectLink>
-              ) : (
-                x.name
-              ),
+              x.name,
               x.detail,
               <Badge>{x.status}</Badge>,
               <div className="actions">
@@ -420,9 +583,6 @@ export function Supporting({ page }: { page: string }) {
                 <Btn onClick={() => act({ type: "EXTRA_TOGGLE", id: x.id })}>
                   {x.status === "启用" ? "停用" : "启用"}
                 </Btn>
-                {page === "equipment" && (
-                  <Btn onClick={() => OO(true)}>对象与检测项</Btn>
-                )}
               </div>,
             ])}
           />
@@ -468,18 +628,6 @@ export function Supporting({ page }: { page: string }) {
           >
             保存
           </Btn>
-        </Modal>
-      )}
-      {/* 设备资源页：就地查看「对象与检测项」，不离开当前页 */}
-      {objectsOpen && (
-        <Modal title="设备 → 对象 → 检测项" onClose={() => OO(false)} wide>
-          {objectsTable}
-          <div className="modal-actions">
-            <Btn onClick={() => OO(false)}>关闭</Btn>
-            <Btn primary onClick={() => go("annotation")}>
-              业务标注工作台
-            </Btn>
-          </div>
         </Modal>
       )}
     </>

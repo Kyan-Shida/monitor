@@ -9,6 +9,7 @@ export function ObjectLink({
   children,
   tab,
   to,
+  from,
 }: {
   type: string;
   id?: string;
@@ -16,6 +17,8 @@ export function ObjectLink({
   tab?: string;
   /** 目标页面 ID：传入时渲染为可跳转入口（如结果详情内置页）；不传则保持纯展示，不做下钻 */
   to?: string;
+  /** 显式来源页：目标为内置详情页时带回，用于其面包屑与返回按入口动态归属 */
+  from?: { page: string; id?: string };
 }) {
   // 默认纯展示：保留 ID/名称信息但不做下钻跳转，避免为下钻而切碎使用流程
   const text =
@@ -28,7 +31,7 @@ export function ObjectLink({
         type="button"
         className="object-link goto"
         title={`${text} · 查看详情`}
-        onClick={() => go(to, id, tab)}
+        onClick={() => go(to, id, tab, from)}
       >
         {children || id || "—"}
       </button>

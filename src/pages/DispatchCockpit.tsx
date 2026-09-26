@@ -280,7 +280,7 @@ export function DispatchCockpit({
             </div>
             <div className="actions">
               <Can perm={PERMS.远程接管}>
-                <Btn primary onClick={() => go("control", robot?.id)}>
+                <Btn primary onClick={() => go("manual", robot?.id)}>
                   {session ? "进入操控台" : "申请接管"}
                 </Btn>
               </Can>

@@ -57,7 +57,7 @@ export function Operations({ page, id }: { page: string; id?: string }) {
                 r.current || "无",
                 <div className="actions">
                   <Btn onClick={() => go("robot", r.id)}>详情</Btn>
-                  <Btn onClick={() => go("control", r.id)}>遥控台</Btn>
+                  <Btn onClick={() => go("manual", r.id)}>遥控台</Btn>
                 </div>,
               ])}
           />
@@ -76,7 +76,7 @@ export function Operations({ page, id }: { page: string; id?: string }) {
             ))}
           </select>
           <Badge>{r.state}</Badge>
-          <Btn primary onClick={() => go("control", r.id)}>
+          <Btn primary onClick={() => go("manual", r.id)}>
             操作 / 遥控台
           </Btn>
           <Btn onClick={() => go("queue")}>任务队列</Btn>
@@ -244,7 +244,7 @@ export function Operations({ page, id }: { page: string; id?: string }) {
             <Btn onClick={() => go("maps")}>01 地图 → 标注 → 同步</Btn>
             <Btn onClick={() => go("templates")}>02 模板 → 调度 → 执行</Btn>
             <Btn onClick={() => go("alarms")}>03 异常 → 复查 → 关闭</Btn>
-            <Btn onClick={() => go("control", "R01")}>
+            <Btn onClick={() => go("manual", "R01")}>
               04 接管 → 遥控 → 恢复
             </Btn>
           </div>

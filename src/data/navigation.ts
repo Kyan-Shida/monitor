@@ -26,8 +26,6 @@ export const groups = [
     "dispatch-log:调度记录::调度",
     "execution:实时执行监控::执行",
     "replay:执行回溯记录::执行",
-    "control:远程操控台::远程操控",
-
   ],
   [
     "结果与异常",
@@ -81,7 +79,6 @@ const hiddenIds = [
   "media",
   "users",
   "quick",
-  "objects",
 ];
 const roots = [
   "workbench",
@@ -99,14 +96,12 @@ const paths: Record<string, string> = {
   calendar: "monitor/calendar",
   robots: "robots/monitor",
   robot: "robots/detail",
-  control: "robots/control",
   maps: "robots/maps",
   health: "robots/health",
   "robot-map": "robots/map",
   manual: "robots/manual",
   device: "robots/device",
   equipment: "resources/equipment",
-  objects: "resources/objects",
   points: "resources/points",
   annotation: "resources/annotation",
   routes: "resources/routes",
@@ -150,7 +145,6 @@ const paths: Record<string, string> = {
 };
 const parents: Record<string, string> = {
   robot: "robots",
-  control: "robots",
   annotation: "points",
   "plan-edit": "plans",
   review: "results",
@@ -263,6 +257,8 @@ export interface Route {
   page: string;
   id?: string;
   tab?: string;
+  /** 详情页的显式来源页：由入口页在链接上带回（`?from=page/id`），用于面包屑与返回的动态归属 */
+  from?: { page: string; id?: string };
 }
 export function parse(hash = location.hash): Route {
   const [raw, q] = hash.replace(/^#\/?/, "").split("?");
@@ -276,20 +272,45 @@ export function parse(hash = location.hash): Route {
     ? decodeURIComponent(raw.slice(match[1].length + 1)) || undefined
     : params.get("id") || undefined;
   if (page === "tasks" && id) page = "task-detail";
-  return { page, id, tab: params.get("tab") || undefined };
+  // 显式来源页：格式 `page` 或 `page/id`（同一内置页可由不同业务页进入，故需带回来源）
+  const fromRaw = params.get("from");
+  let from: Route["from"];
+  if (fromRaw) {
+    const [fp, fid] = fromRaw.split("/");
+    from = fp ? { page: fp, id: fid ? decodeURIComponent(fid) : undefined } : undefined;
+  }
+  return { page, id, tab: params.get("tab") || undefined, from };
 }
-export function href(page: string, id?: string, tab?: string) {
+export function href(
+  page: string,
+  id?: string,
+  tab?: string,
+  from?: { page: string; id?: string },
+) {
   if (page === "tasks" && id) page = "task-detail";
+  const qs = new URLSearchParams();
+  if (tab) qs.set("tab", tab);
+  if (from)
+    qs.set(
+      "from",
+      from.page + (from.id ? "/" + encodeURIComponent(from.id) : ""),
+    );
+  const q = qs.toString();
   return (
     "#/" +
     (paths[page] || page) +
     (id ? "/" + encodeURIComponent(id) : "") +
-    (tab ? "?tab=" + encodeURIComponent(tab) : "")
+    (q ? "?" + q : "")
   );
 }
 
-export function go(page: string, id?: string, tab?: string) {
-  const next = href(page, id, tab);
+export function go(
+  page: string,
+  id?: string,
+  tab?: string,
+  from?: { page: string; id?: string },
+) {
+  const next = href(page, id, tab, from);
   if (next === location.hash) return;
   location.hash = next;
 }
@@ -315,7 +336,13 @@ export function parentTargetOf(page: string): string | undefined {
  * @description 内置页 → 二级列表页（终点）；驾驶舱 → 工作台
  */
 export function back() {
-  const target = parentTargetOf(parse().page);
+  const r = parse();
+  // 详情页带回了显式来源页时，优先沿该来源返回（含来源页的 id），保持上下文一致
+  if (r.from) {
+    go(r.from.page, r.from.id);
+    return;
+  }
+  const target = parentTargetOf(r.page);
   if (target) go(target);
 }
 export function goCenter(page: string) {

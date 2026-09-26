@@ -279,7 +279,7 @@ export function Execution({ id }: { id?: string }) {
         >
           恢复任务
         </Btn>
-        <Btn disabled={!r} onClick={() => go("control", r?.id)}>
+        <Btn disabled={!r} onClick={() => go("manual", r?.id)}>
           人工接管 →
         </Btn>
         <Btn
