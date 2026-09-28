@@ -79,6 +79,8 @@ const hiddenIds = [
   "media",
   "users",
   "quick",
+  /** 执行回溯记录列表目录已下线：回溯统一走「执行回溯」内置页（replay-detail），路由保留供直接访问 */
+  "replay",
 ];
 const roots = [
   "workbench",
@@ -125,6 +127,8 @@ const paths: Record<string, string> = {
   "alarm-detail": "results/equipment/alarm",
   /** 执行回溯内置页：挂在设备巡检档案目录下，用于档案内的任务过程回放 */
   "replay-detail": "results/equipment/replay",
+  /** 巡检结果详情内置页：挂在「巡检结果查询」分支下，由结果查询任务行「详情」进入（非弹窗） */
+  "result-view": "results/task-result",
   services: "ai/services",
   rules: "alarms/rules",
   alarms: "alarms/events",
@@ -152,6 +156,7 @@ const parents: Record<string, string> = {
   "result-detail": "archive",
   "alarm-detail": "archive",
   "replay-detail": "archive",
+  "result-view": "results",
   alarm: "alarms",
   point: "points",
   "task-detail": "tasks",
@@ -242,6 +247,14 @@ export const routeMeta = [
     name: "执行回溯",
     path: paths["replay-detail"],
     parent: "archive",
+  },
+  {
+    // 巡检结果详情内置页：无侧边栏入口，挂在「巡检结果查询」下（入口为结果查询任务行「详情」）
+    ...pages.find((x) => x.id === "results")!,
+    id: "result-view",
+    name: "巡检结果详情",
+    path: paths["result-view"],
+    parent: "results",
   },
   {
     // 驾驶舱大屏：仅由顶栏入口以新标签页打开，故不写入 groups（不出现在侧边栏与中心 Tab）

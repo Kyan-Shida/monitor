@@ -8,6 +8,9 @@ dist-static/
 # 浏览器临时配置目录（导出/预览过程产生的 Edge 用户数据，体积大且不可复现）
 edge-tmp/
 
+# 浏览器自动化调试产物（playwright-cli 的快照与 console 日志，仅本地排查用）
+.playwright-cli/
+
 # 本地运行日志
 dev.log
 npm-debug.log*

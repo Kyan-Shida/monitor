@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useStore } from "../data/store";
 import { go, useViewState } from "../data/navigation";
 import { pointOf, deviceCode, fmtTime } from "../data/selectors";
-import { Btn, Badge, Panel, Table, Field, Note, Steps } from "../components/UI";
+import { Btn, Badge, Panel, Table, Field, Note, Steps, Modal } from "../components/UI";
 import { ObjectLink, Pager } from "../components/Business";
 import { Video } from "../components/Video";
 import { ResultTrend } from "../components/ResultTrend";
@@ -21,8 +21,6 @@ export function Results({ page, id }: { page: string; id?: string }) {
     [conclusion, C] = useState("确认"),
     [finalState, FS] = useState(""),
     [evidence, E] = useState("照片");
-  // 任务维度：记录已展开明细的任务 ID，默认收起以保证任务多时列表高度可控
-  const [expandedTasks, setExpandedTasks] = useState<string[]>([]);
   const r = s.results.find((x) => x.id === id) || s.results[0];
   /**
    * 提交复核：结论写入结果，并作为审计记录追加到该结果
@@ -78,25 +76,11 @@ export function Results({ page, id }: { page: string; id?: string }) {
       const kb = s.tasks.find((t) => t.id === b[0])?.finishedAt || "";
       return kb.localeCompare(ka);
     });
-    // 任务作为外层：每页展示若干「任务行」，明细默认收起，避免任务多时页面高度失控
+    // 任务作为外层：每页展示若干「任务行」，明细统一在「详情」弹窗的「表计识别」中查看
     const pageSize = 10;
     const pageGroups = groups.slice((pn - 1) * pageSize, pn * pageSize);
-    // 单任务场景（由任务详情 / 告警复查跳转）默认展开，直接看到该任务的全部结果
-    const isOpen = (taskId: string) =>
-      groups.length === 1 || expandedTasks.includes(taskId);
-    const allOpen =
-      groups.length > 0 && groups.every(([taskId]) => isOpen(taskId));
-    /**
-     * 切换某任务的明细展开状态
-     * @param taskId 任务 ID
-     */
-    const toggleTask = (taskId: string) =>
-      setExpandedTasks((prev) =>
-        prev.includes(taskId)
-          ? prev.filter((x) => x !== taskId)
-          : [...prev, taskId],
-      );
     return (
+      <>
       <Panel title="巡检结果 · 业务检测记录">
         <div className="filter-bar">
           <Field label="关键词（设备 / 对象 / 检测项）">
@@ -198,17 +182,9 @@ export function Results({ page, id }: { page: string; id?: string }) {
             <span className="muted">
               共 {groups.length} 个任务 · {filtered.length} 条检测结果
             </span>
-            {groups.length > 1 && (
-              <Btn
-                onClick={() =>
-                  setExpandedTasks(
-                    allOpen ? [] : groups.map(([taskId]) => taskId),
-                  )
-                }
-              >
-                {allOpen ? "全部收起" : "全部展开"}
-              </Btn>
-            )}
+            <span className="muted">
+              点任务行「详情」查看该任务的巡检结果详情与 AI 识别结果
+            </span>
           </div>
         )}
         {pageGroups.map(([taskId, list]) => {
@@ -217,21 +193,13 @@ export function Results({ page, id }: { page: string; id?: string }) {
           const pend = list.filter((r) => r.status === "待复核").length;
           // 任务判断：该任务存在任一异常结果即判为「异常」，否则判为「正常」
           const ok = abn === 0;
-          const open = isOpen(taskId);
           return (
             <div className="task-group" key={taskId}>
-              <button
-                type="button"
-                className={
-                  "task-group-head" +
-                  (open ? " open" : "") +
-                  (ok ? " ok" : " abn")
-                }
-                aria-expanded={open}
-                onClick={() => toggleTask(taskId)}
+              {/* 任务行只作概要展示：结果明细统一在「详情」弹窗的「表计识别」中查看 */}
+              <div
+                className={"task-group-head" + (ok ? " ok" : " abn")}
               >
                 <span className={"tg-flag" + (ok ? " ok" : " abn")} />
-                <span className="tg-caret">{open ? "▾" : "▸"}</span>
                 <span className="tg-main">
                   <span className="tg-title">
                     <b>{t?.name || taskId}</b>
@@ -260,50 +228,17 @@ export function Results({ page, id }: { page: string; id?: string }) {
                     待复核 <b>{pend}</b>
                   </span>
                 </span>
-                <span className="tg-toggle">{open ? "收起" : "展开"}</span>
-              </button>
-              {open && (
-                <Table
-                  heads={[
-                    "结果 / 时间",
-                    "设备 / 对象",
-                    "业务点位 / 检测项",
-                    "识别 → 最终值",
-                    "判断 / 状态",
-                    "操作",
-                  ]}
-                  rows={list.map((r) => {
-                    const p = pointOf(s, r);
-                    return [
-                      <>
-                        {r.id}
-                        <small>{r.time}</small>
-                      </>,
-                      <>
-                        <ObjectLink
-                          type="archive"
-                          id={p && deviceCode(p.device)}
-                        >
-                          {p?.device}
-                        </ObjectLink>
-                        <small>{p?.object}</small>
-                      </>,
-                      <>
-                        <ObjectLink type="point" id={r.pointId}>
-                          {p?.name}
-                        </ObjectLink>
-                        <small>{r.item}</small>
-                      </>,
-                      `${r.recognized} → ${r.final} ${r.unit}`,
-                      <>
-                        <Badge>{r.abnormal ? "异常" : "正常"}</Badge>
-                        <Badge>{r.status}</Badge>
-                      </>,
-                      <Btn onClick={() => go("review", r.id)}>证据 / 复核</Btn>,
-                    ];
-                  })}
-                />
-              )}
+                <span
+                  className="tg-detail"
+                  role="button"
+                  title="进入该任务的巡检结果详情内置页（任务概要 + AI 识别结果 + 复核）"
+                  onClick={() =>
+                    go("result-view", taskId, undefined, { page: "results" })
+                  }
+                >
+                  详情
+                </span>
+              </div>
             </div>
           );
         })}
@@ -315,6 +250,7 @@ export function Results({ page, id }: { page: string; id?: string }) {
           onChange={PN}
         />
       </Panel>
+      </>
     );
   }
   // 「结果详情」内置页：只读展示单个结果的证据、值链路、复核历史与关联告警；复核操作在「结果详情 / 复核」页完成
@@ -463,7 +399,6 @@ export function Results({ page, id }: { page: string; id?: string }) {
         <ObjectLink type="robot" id={t?.robotId} />
         <Badge>{r.status}</Badge>
         <span className="muted">采集 {r.time}</span>
-        <Btn onClick={() => go("replay", r.taskId)}>任务过程回放 →</Btn>
       </div>
       <div className="result-workbench">
         <Panel title="原始采集证据">
@@ -607,7 +542,10 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
   const { s, act } = useStore();
   const [note, N] = useState(""),
     [filter, F] = useViewState("alarms.filter", "全部");
-  if (page === "alarms")
+  const [modal, setModal] = useState<null | "result" | "task">(null);
+  // 告警事件列表：支持从驾驶舱「今日告警」下钻（URL 带告警 id），高亮目标行并给出上下文
+  if (page === "alarms") {
+    const focus = id ? s.alarms.find((x) => x.id === id) : undefined;
     return (
       <Panel
         title="告警事件"
@@ -621,6 +559,23 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
           </select>
         }
       >
+        {focus && (
+          <div className="context-bar">
+            <b>驾驶舱下钻</b>
+            <span className="bc-id">{focus.id}</span>
+            <Badge>{focus.level}</Badge>
+            <Badge>{focus.state}</Badge>
+            <span>{focus.name}</span>
+            <span className="muted">
+              {focus.time} · {focus.pointId}
+            </span>
+            <div className="actions">
+              <Btn primary onClick={() => go("alarm", focus.id)}>
+                处置 / 复查
+              </Btn>
+            </div>
+          </div>
+        )}
         <Table
           heads={[
             "告警名称",
@@ -634,7 +589,7 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
           rows={s.alarms
             .filter((a) => filter === "全部" || a.state === filter)
             .map((a) => [
-              a.name,
+              a.id === id ? <b className="hl-row">{a.name}</b> : a.name,
               <Badge>{a.level}</Badge>,
               <ObjectLink type="point" id={a.pointId} />,
               <ObjectLink type="task-detail" id={a.taskId} />,
@@ -645,6 +600,7 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
         />
       </Panel>
     );
+  }
   // 「告警详情」内置页（设备巡检档案目录下）：只读展示告警上下文与处置轨迹；处置 / 复查操作在「告警详情 / 复查」页完成
   if (page === "alarm-detail") {
     const ad = s.alarms.find((x) => x.id === id);
@@ -720,6 +676,7 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
   const a = s.alarms.find((a) => a.id === id) || s.alarms[0];
   if (!a) return <Note>尚无告警。</Note>;
   const r = s.results.find((r) => r.id === a.resultId);
+  const t = s.tasks.find((x) => x.id === a.taskId);
   return (
     <>
       <div className="context-bar">
@@ -765,8 +722,8 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
             触发结果：{r?.raw} {r?.unit} · {r?.source}
           </p>
           <div className="actions">
-            <Btn onClick={() => go("review", a.resultId)}>原始结果</Btn>
-            <Btn onClick={() => go("tasks", a.taskId)}>来源任务</Btn>
+            <Btn onClick={() => setModal("result")}>原始结果</Btn>
+            <Btn onClick={() => setModal("task")}>来源任务</Btn>
           </div>
         </Panel>
         <Panel title="告警处置工作台">
@@ -836,6 +793,69 @@ export function Alarms({ page, id }: { page: string; id?: string }) {
           ))}
         </Panel>
       </div>
+      {modal && (
+        <Modal
+          title={modal === "result" ? "原始结果" : "来源任务"}
+          onClose={() => setModal(null)}
+          wide
+        >
+          {modal === "result"
+            ? r
+              ? (
+                <div className="grid two">
+                  <Panel title="结果概要">
+                    <Field label="结果 ID">{r.id}</Field>
+                    <Field label="判定">
+                      <Badge>{r.abnormal ? "异常" : "正常"}</Badge>
+                    </Field>
+                    <Field label="状态">{r.status}</Field>
+                    <Field label="检测项">{r.item}</Field>
+                    <Field label="采集时间">{r.time}</Field>
+                    <Field label="设备">
+                      {s.points.find((p) => p.id === r.pointId)?.device}
+                    </Field>
+                    <Field label="点位">
+                      {s.points.find((p) => p.id === r.pointId)?.name ??
+                        r.pointId}
+                    </Field>
+                    <Field label="所属任务">{r.taskId}</Field>
+                  </Panel>
+                  <Panel title="识别与来源">
+                    <Field label="触发结果">{r.raw} {r.unit} · {r.source}</Field>
+                    <Field label="识别结果">{r.recognized} → 最终 {r.final}</Field>
+                    <Field label="置信度">{Math.round(r.confidence * 100)}%</Field>
+                  </Panel>
+                </div>
+              )
+              : <Note>未找到对应的巡检结果（{a.resultId}）。</Note>
+            : t
+              ? (
+                <div className="grid two">
+                  <Panel title="任务概要">
+                    <Field label="任务 ID">{t.id}</Field>
+                    <Field label="名称">{t.name}</Field>
+                    <Field label="来源">{t.source}</Field>
+                    <Field label="优先级"><Badge>{t.priority}</Badge></Field>
+                    <Field label="类型">{t.taskType}</Field>
+                    <Field label="状态"><Badge>{t.state}</Badge></Field>
+                  </Panel>
+                  <Panel title="执行与关联">
+                    <Field label="原子动作">{t.atomicActions.join("、")}</Field>
+                    <Field label="执行机器人">{t.robotId}</Field>
+                    <Field label="关联计划">
+                      {t.planId
+                        ? `${t.planId}${t.planVersion ? `（v${t.planVersion}）` : ""}`
+                        : "—"}
+                    </Field>
+                    <Field label="触发告警">{t.alarmId ?? "—"}</Field>
+                    <Field label="创建时间">{t.created}</Field>
+                    <Field label="开始 / 结束">{t.startedAt ?? "—"} / {t.finishedAt ?? "—"}</Field>
+                  </Panel>
+                </div>
+              )
+              : <Note>未找到对应的任务（{a.taskId}）。</Note>}
+        </Modal>
+      )}
     </>
   );
 }

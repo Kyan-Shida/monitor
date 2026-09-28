@@ -267,8 +267,11 @@ export interface Extra {
   detail: string;
 }
 export interface State {
-  /** 数据模型版本：1 → 2 新增工单/验收/接管/反馈/现场/资产集合；2 → 3 模板新增 state 字段 */
-  schema: 3;
+  /**
+   * 数据模型 / 种子数据版本：1 → 2 新增工单/验收/接管/反馈/现场/资产集合；2 → 3 模板新增 state 字段；
+   * 5 → 6 扩充点位 / 任务 / 结果 / 告警 / 工单演示数据（版本变更会让旧本地缓存自动失效并重载 seed）
+   */
+  schema: number;
   maps: MapAsset[];
   points: Point[];
   robots: Robot[];

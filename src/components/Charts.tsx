@@ -3,6 +3,7 @@
  * @description 驾驶舱图表：甜甜圈（多值占比）与环形进度（单值百分比），纯 SVG 实现，无第三方依赖
  * @interaction 被 pages/MonitorCockpit.tsx 消费
  */
+import { useState } from "react";
 
 /** 图表数据项 */
 export interface Slice {
@@ -13,25 +14,32 @@ export interface Slice {
 
 /**
  * 甜甜圈图：按数值占比分段绘制，中心可显示总数
+ * @description 鼠标悬浮某一段时，该段加粗、其余段淡出，并在中心显示该段对应内容（名称 + 次数 + 占比）
  * @param data 分段数据
  * @param size 画布边长（px）
  * @param thickness 圆环粗细（px）
- * @param center 中心文字；不传则不显示
+ * @param center 中心文字（无悬浮时显示）；不传则不显示
  */
 export function Donut({
   data,
   size = 136,
   thickness = 20,
   center,
+  onHover,
 }: {
   data: Slice[];
   size?: number;
   thickness?: number;
   center?: string;
+  /** 悬浮分段回调（用于与外部列表联动高亮）；移出时回调 null */
+  onHover?: (index: number | null) => void;
 }) {
+  /** 当前悬浮的分段索引：用于高亮该段并在中心展示明细 */
+  const [hover, SETHOVER] = useState<number | null>(null);
   const total = data.reduce((a, x) => a + x.value, 0);
   const r = (size - thickness) / 2;
   const c = 2 * Math.PI * r;
+  const active = hover === null ? null : data[hover];
   let offset = 0;
   return (
     <svg
@@ -50,7 +58,7 @@ export function Donut({
         strokeWidth={thickness}
       />
       {total > 0 &&
-        data.map((x) => {
+        data.map((x, i) => {
           const len = (x.value / total) * c;
           const node = (
             <circle
@@ -60,25 +68,64 @@ export function Donut({
               r={r}
               fill="none"
               stroke={x.color}
-              strokeWidth={thickness}
+              strokeWidth={hover === i ? thickness + 4 : thickness}
+              opacity={hover === null || hover === i ? 1 : 0.3}
               strokeDasharray={`${len} ${c - len}`}
               strokeDashoffset={-offset}
               transform={`rotate(-90 ${size / 2} ${size / 2})`}
-            />
+              style={{ cursor: "pointer", transition: "opacity .15s" }}
+              onMouseEnter={() => {
+                SETHOVER(i);
+                onHover?.(i);
+              }}
+              onMouseLeave={() => {
+                SETHOVER(null);
+                onHover?.(null);
+              }}
+            >
+              <title>{`${x.label} · ${x.value} 次 · ${Math.round(
+                (x.value / total) * 100,
+              )}%`}</title>
+            </circle>
           );
           offset += len;
           return node;
         })}
-      {center && (
-        <text
-          x={size / 2}
-          y={size / 2 + 6}
-          textAnchor="middle"
-          fontSize="18"
-          fill="#dff2ff"
-        >
-          {center}
-        </text>
+      {active && total > 0 ? (
+        <>
+          <text
+            x={size / 2}
+            y={size / 2 - 4}
+            textAnchor="middle"
+            fontSize="11"
+            fill="#a9bfd4"
+          >
+            {active.label.length > 9
+              ? active.label.slice(0, 9) + "…"
+              : active.label}
+          </text>
+          <text
+            x={size / 2}
+            y={size / 2 + 16}
+            textAnchor="middle"
+            fontSize="16"
+            fill="#dff2ff"
+          >
+            {active.value} 次 · {Math.round((active.value / total) * 100)}%
+          </text>
+        </>
+      ) : (
+        center && (
+          <text
+            x={size / 2}
+            y={size / 2 + 6}
+            textAnchor="middle"
+            fontSize="18"
+            fill="#dff2ff"
+          >
+            {center}
+          </text>
+        )
       )}
     </svg>
   );

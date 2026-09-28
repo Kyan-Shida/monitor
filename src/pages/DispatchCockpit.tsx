@@ -5,7 +5,7 @@
  * @interaction 由 App.tsx 在 page === "screen" 时渲染；指标取自 data/metrics.ts，动作经 data/engine.ts
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Maximize, Minimize } from "lucide-react";
+import { CameraOff, Maximize, Minimize } from "lucide-react";
 import { useStore } from "../data/store";
 import { go } from "../data/navigation";
 import { Can } from "../components/Can";
@@ -14,6 +14,7 @@ import { Badge, Btn, Modal, Note } from "../components/UI";
 import { MapCanvas } from "../components/MapCanvas";
 import { ScreenTopBar, type CockpitId } from "../components/ScreenTopBar";
 import { Video } from "../components/Video";
+import { AutoScrollList } from "../components/AutoScrollList";
 import { ControlPad, type MoveCommand } from "../components/ControlPad";
 import { Sparkline } from "../components/Sparkline";
 import { metricValue, scopedState } from "../data/metrics";
@@ -37,8 +38,8 @@ export function DispatchCockpit({
   const [layers, LAY] = useState({ points: true, chargers: true, rails: true });
   const [speed, SPEED] = useState(5);
   const [selected, SEL] = useState<string>();
-  const [pickedAlarm, PICKAL] = useState<string>();
-  const [pickedWo, PICKWO] = useState<string>();
+  /** 设备池「全选」：一次性选中当前筛选的全部机器（地图全部高亮、明细/告警按全部机器展示） */
+  const [allSel, SETALL] = useState(false);
   const [now, NOW] = useState(() => new Date());
   const [fs, FS] = useState(false);
   /** 全屏失败提示：部分预览环境禁用浏览器全屏 API */
@@ -80,7 +81,14 @@ export function DispatchCockpit({
     if (taskState === "空闲" && r.state !== "空闲") return false;
     return true;
   });
-  const robot = robots.find((r) => r.id === selected) || robots[0];
+  /** 单台生效的机器：全选状态下不指定单台（仅作整体展示，操控需点选单台） */
+  const activeId = allSel ? undefined : selected;
+  /** 当前设备：仅当左栏选中单台机器时存在；未选中 / 全选时所有操控入口不可用 */
+  const robot = robots.find((r) => r.id === activeId);
+  /** 未选中设备时的引导文案：区分「已全选」与「未选择」 */
+  const pickHint = allSel
+    ? "已全选设备：操控仅支持单台，请在设备列表中点选一台机器"
+    : "未选择设备：请先在左侧设备列表点选一台机器";
   const task = robot ? currentTask(s, robot) : undefined;
   const queue = robot ? queueFor(s, robot.id) : [];
   /** 有效接管会话：只有已接管且未到期时才允许下发手动指令 */
@@ -89,11 +97,25 @@ export function DispatchCockpit({
       x.robotId === robot?.id && x.state === "已接管" && x.expires > Date.now(),
   );
 
+  /** 未关闭告警 */
+  const openAlarms = useMemo(
+    () => s.alarms.filter((a) => a.state !== "已关闭"),
+    [s.alarms],
+  );
+  /** 选中机器后只看该机器任务的告警；未选中 / 全选时展示全部机器 */
+  const scopedAlarms = useMemo(
+    () =>
+      activeId
+        ? openAlarms.filter(
+            (a) => s.tasks.find((t) => t.id === a.taskId)?.robotId === activeId,
+          )
+        : openAlarms,
+    [openAlarms, s.tasks, activeId],
+  );
   /** 告警去重合并：同点位 + 同级别的未关闭告警合并为一条，标注合并条数 */
-  const openAlarms = s.alarms.filter((a) => a.state !== "已关闭");
   const alarmGroups = useMemo(() => {
     const groups = new Map<string, Alarm[]>();
-    openAlarms.forEach((a) => {
+    scopedAlarms.forEach((a) => {
       const key = `${a.pointId}|${a.level}`;
       groups.set(key, [...(groups.get(key) || []), a]);
     });
@@ -102,13 +124,13 @@ export function DispatchCockpit({
       items,
       head: items[0],
       /** 分级抑制：同点位存在更高级别告警时，低级别仅记录不推送处置 */
-      suppressed: openAlarms.some(
+      suppressed: scopedAlarms.some(
         (x) =>
           x.pointId === items[0].pointId &&
           levelRank(x.level) > levelRank(items[0].level),
       ),
     }));
-  }, [openAlarms]);
+  }, [scopedAlarms]);
   /** 未闭环工单：SLA 倒计时列表 */
   const openWos = s.workOrders.filter(
     (w) => !["已验收", "已关闭"].includes(w.state),
@@ -126,8 +148,16 @@ export function DispatchCockpit({
     { n: mv("fieldPending"), label: "现场待处理（项）" },
   ];
 
-  /** 采集数据流：取最近可解析为数值的检测结果，用于波形与明细（无数据时不绘制） */
-  const recentResults = s.results.slice(0, 6);
+  /** 巡检明细：选中机器时展示该机器任务的巡检数据，未选中 / 全选时展示全部机器（仅自动滚动播放，不可点击） */
+  const detailResults = useMemo(() => {
+    const scope = activeId
+      ? s.results.filter(
+          (r) => s.tasks.find((t) => t.id === r.taskId)?.robotId === activeId,
+        )
+      : s.results;
+    return scope.slice(0, 20);
+  }, [s.results, s.tasks, activeId]);
+  /** 采集数据流：取最近可解析为数值的检测结果，用于波形（无数据时不绘制） */
   const wave = s.results
     .filter((r) => Number.isFinite(Number(r.final)))
     .slice(0, 14)
@@ -207,6 +237,19 @@ export function DispatchCockpit({
             <h3>
               设备状态
               <small>在线 {mv("onlineCount")}/{mv("devices")}</small>
+              {/* 全选：一次选中当前筛选的全部机器（地图全部高亮；操控仍需点选单台） */}
+              <span className="cs-range">
+                <button
+                  className={allSel ? "active" : ""}
+                  title="一次选中当前筛选的全部机器"
+                  onClick={() => {
+                    SETALL(!allSel);
+                    SEL(undefined);
+                  }}
+                >
+                  {allSel ? "取消全选" : "全选"}
+                </button>
+              </span>
             </h3>
             <div className="ds-selects">
               <select aria-label="厂区" value={region} onChange={(e) => SETR(e.target.value)}>
@@ -229,8 +272,12 @@ export function DispatchCockpit({
               {robots.map((r) => (
                 <button
                   key={r.id}
-                  className={r.id === robot?.id ? "active" : ""}
-                  onClick={() => SEL(r.id)}
+                  className={allSel || r.id === selected ? "active" : ""}
+                  title="点击选中该机器后可执行导航 / 任务 / 云台操作；再次点击取消选择"
+                  onClick={() => {
+                    SETALL(false);
+                    SEL(r.id === selected ? undefined : r.id);
+                  }}
                 >
                   <i
                     className="cs-dot"
@@ -256,7 +303,7 @@ export function DispatchCockpit({
           <section className="cs-card">
             <h3>
               当前设备
-              <small>{robot?.id || "—"}</small>
+              <small>{robot ? robot.id : "未选择"}</small>
             </h3>
             <div className="cs-kv">
               <span>
@@ -266,30 +313,40 @@ export function DispatchCockpit({
                 区域<b>{robot?.region || "—"}</b>
               </span>
               <span>
-                电量<b>{robot?.battery ?? 0}%</b>
+                电量<b>{robot ? `${robot.battery}%` : "—"}</b>
               </span>
               <span>
-                通信<b>{robot?.state === "离线" ? "离线" : "在线"}</b>
+                通信
+                <b>{robot ? (robot.state === "离线" ? "离线" : "在线") : "—"}</b>
               </span>
               <span>
-                巡检进度<b>{stageOf(task)}</b>
+                巡检进度<b>{robot ? stageOf(task) : "—"}</b>
               </span>
               <span>
-                接管会话<b>{session ? session.id : "未接管"}</b>
+                接管会话<b>{robot ? (session ? session.id : "未接管") : "—"}</b>
               </span>
             </div>
+            {/* 操控入口：未选中机器时一律不可用 */}
             <div className="actions">
               <Can perm={PERMS.远程接管}>
-                <Btn primary onClick={() => go("manual", robot?.id)}>
+                <Btn
+                  primary
+                  disabled={!robot}
+                  onClick={() => robot && go("manual", robot.id)}
+                >
                   {session ? "进入操控台" : "申请接管"}
                 </Btn>
               </Can>
               <Can perm={PERMS.一键返航充电}>
-                <Btn onClick={() => HOME(true)}>一键返航</Btn>
+                <Btn disabled={!robot} onClick={() => HOME(true)}>
+                  一键返航
+                </Btn>
               </Can>
             </div>
             <small className="cs-hint">
-              关机重点：{deviceProfile[robot?.deviceType || "机器狗"].focusItems.join(" / ")}
+              {robot
+                ? `关机重点：${deviceProfile[robot.deviceType].focusItems.join(" / ")}`
+                : pickHint}
             </small>
           </section>
 
@@ -311,10 +368,16 @@ export function DispatchCockpit({
           </section>
 
           <section className="cs-card">
-            <h3>巡检明细</h3>
-            <div className="cs-work-list readonly">
-              {!recentResults.length && <Note>暂无巡检结果。</Note>}
-              {recentResults.map((r) => (
+            <h3>
+              巡检明细
+              <small>
+                {activeId ? `${activeId} · 自动播放` : "全部机器 · 自动播放"}
+              </small>
+            </h3>
+            {/* 自动上下滚动播放：纯展示，不提供点击与手动上下拉动 */}
+            <AutoScrollList listClass="cs-work-list readonly" rows={3}>
+              {!detailResults.length && <Note>暂无巡检结果。</Note>}
+              {detailResults.map((r) => (
                 <button key={r.id}>
                   <div>
                     <b>{pointName(r.pointId)}</b>
@@ -328,7 +391,7 @@ export function DispatchCockpit({
                   <Badge>{r.status}</Badge>
                 </button>
               ))}
-            </div>
+            </AutoScrollList>
           </section>
         </aside>
 
@@ -338,7 +401,11 @@ export function DispatchCockpit({
             <h3>
               机器人位置
               <small>
-                {robot?.id || "—"} · 坐标 ({robot?.x ?? 0}, {robot?.y ?? 0})
+                {robot
+                  ? `${robot.id} · 坐标 (${robot.x}, ${robot.y})`
+                  : allSel
+                    ? `已全选 ${robots.length} 台 · 点选单台查看坐标`
+                    : "未选择设备 · 点选左侧列表或地图上的机器"}
               </small>
             </h3>
             <div className="ds-layers">
@@ -371,7 +438,12 @@ export function DispatchCockpit({
                 chargers={layers.chargers ? s.chargers : []}
                 rails={layers.rails ? s.railSections : []}
                 fit="xMidYMid slice"
-                onRobot={(rid) => SEL(rid)}
+                selectedRobot={activeId}
+                highlightAll={allSel}
+                onRobot={(rid) => {
+                  SETALL(false);
+                  SEL(rid === selected ? undefined : rid);
+                }}
               />
             </div>
             <div className="cs-map-legend">
@@ -403,7 +475,9 @@ export function DispatchCockpit({
                 hint={
                   session
                     ? `会话 ${session.id} · 已接管，指令即时生效`
-                    : "需先在「远程操控台」申请接管，接管后此处才可操控"
+                    : robot
+                      ? "需先在「远程操控台」申请接管，接管后此处才可操控"
+                      : pickHint
                 }
               />
             </section>
@@ -411,7 +485,9 @@ export function DispatchCockpit({
             <section className="cs-card">
               <h3>
                 任务导航
-                <small>{task ? task.id : "无执行中任务"}</small>
+                <small>
+                  {robot ? (task ? task.id : "无执行中任务") : "未选择设备"}
+                </small>
               </h3>
               <div className="cs-kv">
                 <span>
@@ -425,15 +501,18 @@ export function DispatchCockpit({
                   </b>
                 </span>
                 <span>
-                  待执行队列<b>{queue.length} 项</b>
+                  待执行队列<b>{robot ? `${queue.length} 项` : "—"}</b>
                 </span>
                 <span>
                   机型约束
                   <b>
-                    {deviceProfile[robot?.deviceType || "机器狗"].taskConstraints.join(" / ")}
+                    {robot
+                      ? deviceProfile[robot.deviceType].taskConstraints.join(" / ")
+                      : "—"}
                   </b>
                 </span>
               </div>
+              {/* 任务操作：仅选中机器且存在执行中 / 暂停任务时可用 */}
               {task && ["执行中", "暂停"].includes(task.state) && (
                 <div className="actions">
                   <Can perm={PERMS.调度下发}>
@@ -451,7 +530,9 @@ export function DispatchCockpit({
                 </div>
               )}
               <small className="cs-hint">
-                自动巡航由任务引擎按点位顺序执行；手动导航仅用于特殊情况接管。
+                {robot
+                  ? "自动巡航由任务引擎按点位顺序执行；手动导航仅用于特殊情况接管。"
+                  : pickHint}
               </small>
             </section>
 
@@ -462,19 +543,19 @@ export function DispatchCockpit({
               </h3>
               <div className="ds-cam">
                 <Btn
-                  disabled={!session}
+                  disabled={!session || !robot}
                   onClick={() => sendCmd("云台左转")}
                 >
                   云台左
                 </Btn>
                 <Btn
-                  disabled={!session}
+                  disabled={!session || !robot}
                   onClick={() => sendCmd("云台右转")}
                 >
                   云台右
                 </Btn>
                 <Btn
-                  disabled={!session}
+                  disabled={!session || !robot}
                   onClick={() => sendCmd("云台抬头")}
                 >
                   抬头
@@ -482,14 +563,18 @@ export function DispatchCockpit({
                 <Can perm={PERMS.远程接管}>
                   <Btn
                     primary
-                    disabled={!session}
+                    disabled={!session || !robot}
                     onClick={() => sendCmd("采集照片")}
                   >
                     采集照片
                   </Btn>
                 </Can>
               </div>
-              <small className="cs-hint">接管后可调整相机视角并抓拍留档。</small>
+              <small className="cs-hint">
+                {robot
+                  ? "接管后可调整相机视角并抓拍留档。"
+                  : pickHint}
+              </small>
             </section>
           </div>
         </main>
@@ -498,17 +583,21 @@ export function DispatchCockpit({
         <aside className="cs-right">
           <section className="cs-card grow">
             <h3>
-              告警（去重合并 · 分级抑制）
-              <small>{alarmGroups.length} 组</small>
+              告警 · 去重合并
+              <small>
+                分级抑制 · {activeId ? `${activeId} · ` : "全部机器 · "}
+                {alarmGroups.length} 组 · 自动播放
+              </small>
+              {/* 唯一入口按钮：进入告警事件页；列表本身不逐条加按钮 */}
+              <span className="cs-range">
+                <button onClick={() => go("alarms")}>告警事件 ›</button>
+              </span>
             </h3>
-            <div className="cs-work-list">
+            {/* 自动上下滚动播放：纯展示，不提供点击与手动上下拉动 */}
+            <AutoScrollList listClass="cs-work-list readonly" rows={3}>
               {!alarmGroups.length && <Note>当前无未关闭告警。</Note>}
-              {alarmGroups.slice(0, 5).map((g) => (
-                <button
-                  key={g.key}
-                  className={pickedAlarm === g.key ? "active" : ""}
-                  onClick={() => PICKAL(g.key)}
-                >
+              {alarmGroups.map((g) => (
+                <button key={g.key}>
                   <i
                     className={
                       "severity " + (g.head.level === "重要" ? "red" : "amber")
@@ -525,22 +614,20 @@ export function DispatchCockpit({
                   <Badge>{g.head.level}</Badge>
                 </button>
               ))}
-            </div>
+            </AutoScrollList>
           </section>
 
           <section className="cs-card">
             <h3>
               SLA 倒计时
-              <small>{openWos.length} 单未闭环</small>
+              {/* 不受机器选择影响：恒为全部未闭环工单 */}
+              <small>{openWos.length} 单未闭环 · 自动播放</small>
             </h3>
-            <div className="cs-work-list">
+            {/* 自动上下滚动播放：纯展示，不提供点击与手动上下拉动 */}
+            <AutoScrollList listClass="cs-work-list readonly" rows={3}>
               {!openWos.length && <Note>当前无未闭环工单。</Note>}
               {openWos.map((w) => (
-                <button
-                  key={w.id}
-                  className={pickedWo === w.id ? "active" : ""}
-                  onClick={() => PICKWO(w.id)}
-                >
+                <button key={w.id}>
                   <i
                     className={
                       "severity " +
@@ -564,16 +651,32 @@ export function DispatchCockpit({
                   <Badge>{w.state}</Badge>
                 </button>
               ))}
-            </div>
+            </AutoScrollList>
           </section>
 
           <section className="cs-card">
-            <h3>视频信息</h3>
-            {/* 固定双画面：可见光 + 红外热像，不再提供宫格切换 */}
-            <div className="cs-video-dual">
-              <Video live label="可见光主画面" />
-              <Video live label="红外热像" />
-            </div>
+            <h3>
+              视频信息
+              {robot && <small>{robot.id} 实时画面</small>}
+            </h3>
+            {/* 仅在选中单台机器时展示该机器画面；未选中 / 全选时用空白占位（保持卡片布局稳定） */}
+            {robot ? (
+              <div className="cs-video-dual">
+                <Video live label="可见光主画面" robotId={robot.id} />
+                <Video live label="红外热像" robotId={robot.id} />
+              </div>
+            ) : (
+              <div className="cs-video-dual">
+                {["可见光主画面", "红外热像"].map((label) => (
+                  <div className="video-placeholder" key={label}>
+                    <CameraOff size={28} />
+                    <b>{label}</b>
+                    <small>未选择设备</small>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!robot && <small className="cs-hint">{pickHint}</small>}
           </section>
         </aside>
       </div>

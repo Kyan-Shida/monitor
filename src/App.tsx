@@ -247,7 +247,9 @@ export default function App() {
     body = <Operations page={page} id={id} tab={tab} />;
   else if (page === "maps") body = <Maps id={id} tab={tab} />;
   else if (page === "annotation") body = <Annotation id={id} />;
-  else if (["point", "task-detail", "replay-detail"].includes(page))
+  else if (
+    ["point", "task-detail", "replay-detail", "result-view"].includes(page)
+  )
     body = <ObjectDetails page={page} id={id} />;
   else if (page === "archive") body = <DeviceArchive id={id} tab={tab} />;
   else if (["templates", "plans", "plan-edit", "tasks", "quick"].includes(page))

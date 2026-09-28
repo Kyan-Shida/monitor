@@ -349,13 +349,6 @@ export function Workbench() {
     h < 6 ? "夜深了" : h < 11 ? "早上好" : h < 13 ? "中午好" : h < 18 ? "下午好" : "晚上好";
   /** 日期串：2026.9.26 星期六 */
   const dateStr = `${now.getFullYear()}.${now.getMonth() + 1}.${now.getDate()} 星期${"日一二三四五六"[now.getDay()]}`;
-  /** 待办总数：与下方 KPI 同口径（执行中不算待办） */
-  const todoTotal =
-    pendingResults.length +
-    pendingAlarms.length +
-    pendingTasks.length +
-    robotAttention.length +
-    dueSoon.length;
   /**
    * 快捷入口：管理员最常用的四个功能模块，一键直达免找菜单；
    * 按当前角色权限过滤，无权限的入口不展示
@@ -377,9 +370,7 @@ export function Workbench() {
             <p>
               欢迎回来，{role.person}（{role.name}）
             </p>
-            <small>
-              今天是 {dateStr} · 巡检业务共有 {todoTotal} 项待办等待处理
-            </small>
+            <small>今天是 {dateStr}</small>
           </div>
           <img className="wb-hero-avatar" src={mascot} alt="巡检助手 3D 形象" />
         </section>

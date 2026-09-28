@@ -2,10 +2,13 @@ export function Video({
   label = "V001 出口压力表",
   live = true,
   pan = 0,
+  /** 画面归属机器：驾驶舱按选中设备展示实时画面时标注来源 */
+  robotId,
 }: {
   label?: string;
   live?: boolean;
   pan?: number;
+  robotId?: string;
 }) {
   const thermal = /温度|罐壁|热像/.test(label),
     valve = /阀门/.test(label);
@@ -13,7 +16,9 @@ export function Video({
     <div className="video">
       <div className="video-top">
         <span>● {live ? "模拟实时画面" : "原始证据示意"}</span>
-        <span>CAM 01 · 1080P</span>
+        <span>
+          {robotId ? `${robotId} · ` : ""}CAM 01 · 1080P
+        </span>
       </div>
       <svg viewBox="0 0 600 310">
         <path

@@ -522,7 +522,7 @@ h4 {
   gap: 8px;
 }
 .task-group {
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 .task-group-head {
   position: relative;
@@ -533,55 +533,52 @@ h4 {
   padding: 10px 14px;
   background: #fff;
   border: 1px solid var(--border);
-  border-radius: 5px;
-  overflow: hidden;
-  cursor: pointer;
+  border-radius: 3px;
+  cursor: default;
   text-align: left;
   font: inherit;
   color: inherit;
 }
 .task-group-head:hover {
-  border-color: var(--blue);
-  box-shadow: 0 1px 5px rgba(35, 104, 189, 0.08);
+  border-color: #c9d6e3;
+  background: #fcfdfe;
 }
-/* 左侧判断色条：异常红 / 正常绿，配合行首判断徽标快速定位问题任务 */
+/* 判断与统计一律用文字表达：不再使用左侧色条、实心徽标与胶囊底色 */
 .task-group-head .tg-flag {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
+  display: none;
 }
-.task-group-head .tg-flag.abn {
-  background: #bf5b53;
-}
-.task-group-head .tg-flag.ok {
-  background: #31957f;
-}
-/* 任务判断徽标：正常 / 异常 N，实心高对比 */
 .task-group-head .tg-judge {
-  padding: 1px 9px;
-  border-radius: 10px;
   font-size: 12px;
-  font-weight: 600;
-  color: #fff;
+  font-weight: 500;
 }
 .task-group-head .tg-judge.abn {
-  background: #bf5b53;
+  color: #c0544a;
 }
 .task-group-head .tg-judge.ok {
-  background: #31957f;
+  color: #34806a;
 }
-/* 异常任务整行极浅底色，进一步凸显 */
+/* 行内状态（完成 / 部分完成等）：去底色边框，纯文字 */
+.task-group-head .badge {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: #5f7185;
+}
+.task-group-head .badge.green {
+  color: #34806a;
+}
+.task-group-head .badge.amber {
+  color: #a07531;
+}
+.task-group-head .badge.red {
+  color: #c0544a;
+}
 .task-group-head.abn {
-  background: #fffafa;
+  background: #fff;
 }
-/* 展开时与下方明细表拼接为一张卡片：底边去除、圆角让位给表格 */
 .task-group-head.open {
-  border-color: var(--blue);
-  border-bottom-color: transparent;
-  border-bottom-left-radius: 0;
-  border-bottom-right-radius: 0;
+  border-color: var(--border);
 }
 /* 左侧信息块：标题行（任务名 + 状态）+ 元信息行（任务号 / 机器人 / 结束时间） */
 .task-group-head .tg-main {
@@ -618,38 +615,39 @@ h4 {
   font-size: 11px;
 }
 /* 右侧统计胶囊：检测 / 异常 / 待复核，异常与待复核按等级着色 */
+/* 右侧统计：纯文字，项之间用分隔点 */
 .task-group-head .tg-stats {
   flex: none;
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 0;
 }
 .task-group-head .tg-stat {
-  padding: 2px 10px;
+  padding: 0;
+  background: none;
+  border: 0;
   font-size: 12px;
-  color: #5a6b7b;
-  background: #f4f7fa;
-  border: 1px solid #e6ecf2;
-  border-radius: 11px;
+  color: #8794a3;
   white-space: nowrap;
 }
+.task-group-head .tg-stat + .tg-stat::before {
+  content: "·";
+  margin: 0 8px;
+  color: #c3cedb;
+}
 .task-group-head .tg-stat b {
-  color: #21364d;
-  font-weight: 600;
+  color: #24384f;
+  font-weight: 500;
 }
 .task-group-head .tg-stat.abn {
-  color: #b34a44;
-  background: #fdecec;
-  border-color: #f2c9c6;
+  color: #c0544a;
 }
 .task-group-head .tg-stat.abn b {
-  color: #b34a44;
+  color: #c0544a;
 }
 .task-group-head .tg-stat.warn {
   color: #a07531;
-  background: #fdf6e8;
-  border-color: #efdcb4;
 }
 .task-group-head .tg-stat.warn b {
   color: #a07531;
@@ -660,9 +658,9 @@ h4 {
   font-size: 12px;
 }
 .task-group-head.open + .table-scroll {
-  border: 1px solid var(--blue);
+  border: 1px solid var(--border);
   border-top: none;
-  border-radius: 0 0 5px 5px;
+  border-radius: 0 0 3px 3px;
 }
 .grid {
   display: grid;
@@ -888,6 +886,41 @@ textarea {
 }
 .map-point:hover {
   filter: brightness(1.15);
+}
+/* ── 地图机器：列表点击后的高亮凸显（脉冲光环 + 其余机器淡化） ── */
+.map-robot {
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.map-canvas.has-active-robot .map-robot {
+  opacity: 0.28;
+}
+.map-canvas.has-active-robot .map-robot.active,
+.map-canvas.has-active-robot .map-robot:hover {
+  opacity: 1;
+}
+.map-robot.active {
+  filter: drop-shadow(0 0 8px rgba(255, 176, 32, 0.85));
+}
+.robot-halo {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: robot-pulse 1.5s ease-out infinite;
+}
+@keyframes robot-pulse {
+  0% {
+    r: 30;
+    opacity: 0.9;
+  }
+  100% {
+    r: 48;
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .robot-halo {
+    animation: none;
+  }
 }
 .map-legend {
   display: flex;
@@ -3053,8 +3086,8 @@ progress {
 /* 执行回溯主从布局：左侧任务列表 + 右侧记录详情 */
 .replay-layout {
   display: grid;
-  grid-template-columns: minmax(260px, 300px) minmax(0, 1fr);
-  gap: 18px;
+  grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
+  gap: 16px;
   align-items: start;
 }
 .replay-layout > .panel {
@@ -3184,6 +3217,207 @@ progress {
 .replay-detail {
   min-width: 0;
 }
+
+/* ── 执行回溯详情（对照任务回溯参考版式）：左「双画面 + 导航地图」/ 右「任务汇总 + 分页列表」 ── */
+.replay-view {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(340px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+.rv-media,
+.rv-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.rv-media > .panel,
+.rv-side > .panel {
+  margin: 0;
+}
+/* 双画面：可见光 + 红外并排 */
+.rv-videos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.rv-videos .video {
+  margin-bottom: 0;
+}
+.rv-videos .video svg {
+  height: 168px;
+  min-height: 0;
+}
+.rv-legend {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #8b9aad;
+}
+/* 任务汇总信息：两列网格 */
+.rv-info {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+.rv-info span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  font-size: 11px;
+  color: #9aa9b8;
+}
+.rv-info b {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1d2a37;
+}
+.rv-info .rv-risk {
+  color: #e0533d;
+}
+/* 分页 Tab */
+.rv-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+.rv-tab {
+  padding: 7px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  font-size: 13px;
+  color: #5b6b7d;
+  cursor: pointer;
+}
+.rv-tab:hover {
+  color: #246cba;
+}
+.rv-tab.active {
+  color: #246cba;
+  border-bottom-color: #246cba;
+  font-weight: 600;
+}
+/* 结果行：序号 | 点位 | 检测项数 | 状态 | 展开箭头 */
+.rv-rows {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 430px);
+  min-height: 220px;
+  overflow: auto;
+  padding-right: 4px;
+}
+.rv-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) 56px 56px 22px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 4px;
+  border-bottom: 1px solid #f1f5f9;
+  font-size: 12px;
+}
+.rv-row .n {
+  color: #9aa9b8;
+  text-align: right;
+}
+.rv-row .name,
+.rv-row .name-static {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #1d2a37;
+}
+.rv-row .name {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.rv-row .name:hover {
+  color: #246cba;
+  text-decoration: underline;
+}
+.rv-row .cnt {
+  color: #5b6b7d;
+  text-align: center;
+}
+.rv-row .st {
+  text-align: right;
+}
+.rv-row .st.ok {
+  color: #2f9a76;
+}
+.rv-row .st.bad {
+  color: #e0533d;
+  font-weight: 600;
+}
+.rv-row .st.idle {
+  color: #9aa9b8;
+}
+.rv-row .caret-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.rv-caret {
+  color: #9aa9b8;
+  transition: transform 0.15s ease;
+}
+.rv-row.open .rv-caret {
+  transform: rotate(90deg);
+}
+/* 展开详情：占满整行 */
+.rv-detail {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid #e7eef6;
+  border-radius: 8px;
+  background: #f7fafd;
+}
+.rv-detail-row {
+  display: flex;
+  gap: 8px;
+  padding: 2px 0;
+  font-size: 12px;
+  color: #1f3a52;
+  line-height: 1.6;
+}
+.rv-detail-row i {
+  flex: none;
+  width: 76px;
+  font-style: normal;
+  color: #9aa9b8;
+}
+.rv-thumb {
+  width: 190px;
+  margin-top: 8px;
+}
+.rv-thumb .video {
+  margin-bottom: 0;
+}
+.rv-thumb .video svg {
+  height: 92px;
+  min-height: 0;
+}
+@media (max-width: 1280px) {
+  .replay-view {
+    grid-template-columns: 1fr;
+  }
+}
 /* 窄屏：列表与详情上下堆叠 */
 @media (max-width: 900px) {
   .replay-layout {
@@ -3305,6 +3539,11 @@ progress {
 }
 .panel-body .context-bar {
   flex-wrap: wrap;
+}
+/* 告警事件页：由驾驶舱下钻定位到的目标行高亮 */
+.hl-row {
+  color: var(--blue);
+  font-weight: 700;
 }
 
 /* Layout polish: compact industrial operations workspace */
@@ -4613,10 +4852,13 @@ table th {
 }
 
 /* ── 阶段二：调度指挥驾驶舱（告警 SLA / 操作区 / 视频墙）── */
-/* 全屏展示：以驾驶舱根节点为目标请求全屏（与管理驾驶舱一致），内容超高时在元素内滚动 */
+/* ── 全屏展示：整屏锁定一屏高度，三栏各自滚动；
+     卡片不允许被压扁（flex: 1 0 auto），避免内容溢出卡片造成重叠覆盖 ── */
 .cockpit-screen:fullscreen,
 .cockpit-screen:-webkit-full-screen {
-  /* 全屏时顶栏/KPI/操作条固定，仅三栏内容区内部滚动，操作条不再遮挡卡片 */
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   overflow: hidden;
   border-radius: 0;
   padding: 10px;
@@ -4626,6 +4868,8 @@ table th {
   flex: 1 1 auto;
   min-height: 0;
   overflow: hidden;
+  /* 行高锁死为容器高度，栏内超高时由列滚动承载，而不是把 grid 行撑高 */
+  grid-template-rows: minmax(0, 1fr);
 }
 .cockpit-screen:fullscreen .cs-left,
 .cockpit-screen:-webkit-full-screen .cs-left,
@@ -4633,7 +4877,65 @@ table th {
 .cockpit-screen:-webkit-full-screen .cs-center,
 .cockpit-screen:fullscreen .cs-right,
 .cockpit-screen:-webkit-full-screen .cs-right {
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 174, 204, 0.4) transparent;
+}
+.cockpit-screen:fullscreen .cs-left::-webkit-scrollbar,
+.cockpit-screen:-webkit-full-screen .cs-left::-webkit-scrollbar,
+.cockpit-screen:fullscreen .cs-center::-webkit-scrollbar,
+.cockpit-screen:-webkit-full-screen .cs-center::-webkit-scrollbar,
+.cockpit-screen:fullscreen .cs-right::-webkit-scrollbar,
+.cockpit-screen:-webkit-full-screen .cs-right::-webkit-scrollbar {
+  width: 6px;
+}
+.cockpit-screen:fullscreen .cs-left::-webkit-scrollbar-thumb,
+.cockpit-screen:-webkit-full-screen .cs-left::-webkit-scrollbar-thumb,
+.cockpit-screen:fullscreen .cs-center::-webkit-scrollbar-thumb,
+.cockpit-screen:-webkit-full-screen .cs-center::-webkit-scrollbar-thumb,
+.cockpit-screen:fullscreen .cs-right::-webkit-scrollbar-thumb,
+.cockpit-screen:-webkit-full-screen .cs-right::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(148, 174, 204, 0.38);
+}
+.cockpit-screen:fullscreen .cs-left::-webkit-scrollbar-track,
+.cockpit-screen:-webkit-full-screen .cs-left::-webkit-scrollbar-track,
+.cockpit-screen:fullscreen .cs-center::-webkit-scrollbar-track,
+.cockpit-screen:-webkit-full-screen .cs-center::-webkit-scrollbar-track,
+.cockpit-screen:fullscreen .cs-right::-webkit-scrollbar-track,
+.cockpit-screen:-webkit-full-screen .cs-right::-webkit-scrollbar-track {
+  background: transparent;
+}
+/* 撑满型卡片：空间充足时拉伸对齐底边，空间不足时保持内容高度由列滚动查看 */
+.cockpit-screen:fullscreen .cs-card.grow,
+.cockpit-screen:-webkit-full-screen .cs-card.grow {
+  flex: 1 0 auto;
+}
+/* 顶栏 / 工具条 / KPI / 运营过程区：保持自身高度，不被全屏 flex 压缩变形 */
+.cockpit-screen:fullscreen > .cs-nav,
+.cockpit-screen:-webkit-full-screen > .cs-nav,
+.cockpit-screen:fullscreen > .cs-toolbar,
+.cockpit-screen:-webkit-full-screen > .cs-toolbar,
+.cockpit-screen:fullscreen > .cs-kpi-strip,
+.cockpit-screen:-webkit-full-screen > .cs-kpi-strip,
+.cockpit-screen:fullscreen > .cs-process,
+.cockpit-screen:-webkit-full-screen > .cs-process,
+.cockpit-screen:fullscreen > .screen-command-bar,
+.cockpit-screen:-webkit-full-screen > .screen-command-bar {
+  flex: 0 0 auto;
+}
+/* 三栏内的普通卡片与控制带：同样不被压缩，超高时由所属栏滚动查看 */
+.cockpit-screen:fullscreen .cs-left > .cs-card:not(.grow),
+.cockpit-screen:-webkit-full-screen .cs-left > .cs-card:not(.grow),
+.cockpit-screen:fullscreen .cs-center > .cs-card:not(.grow),
+.cockpit-screen:-webkit-full-screen .cs-center > .cs-card:not(.grow),
+.cockpit-screen:fullscreen .cs-right > .cs-card:not(.grow),
+.cockpit-screen:-webkit-full-screen .cs-right > .cs-card:not(.grow),
+.cockpit-screen:fullscreen .ds-pads,
+.cockpit-screen:-webkit-full-screen .ds-pads {
+  flex: 0 0 auto;
 }
 .screen-robot-list .robot-focus {
   display: block;
@@ -4971,8 +5273,10 @@ table th {
 .cockpit-screen .btn:disabled {
   border-color: rgba(148, 174, 204, 0.16);
   color: #6d8095;
+  opacity: 0.6;
+  cursor: not-allowed;
 }
-.cockpit-screen .btn:hover {
+.cockpit-screen .btn:hover:not(:disabled) {
   border-color: rgba(148, 174, 204, 0.5);
   background: rgba(148, 174, 204, 0.18);
 }
@@ -4981,9 +5285,15 @@ table th {
   background: #2f7fc7;
   color: #ffffff;
 }
-.cockpit-screen .btn.primary:hover {
+.cockpit-screen .btn.primary:hover:not(:disabled) {
   border-color: #63a3e0;
   background: #3a8bd4;
+}
+/* 未选中机器时的主操作按钮：保持可见但明确不可用 */
+.cockpit-screen .btn.primary:disabled {
+  border-color: rgba(75, 147, 214, 0.35);
+  background: rgba(47, 127, 199, 0.35);
+  color: rgba(255, 255, 255, 0.62);
 }
 .cs-kpi-strip {
   display: grid;
@@ -5145,6 +5455,13 @@ table th {
 .cs-list > button:hover {
   border-color: rgba(47, 168, 196, 0.6);
 }
+/* 设备列表已选（联动地图高亮） */
+.cs-list > button.active {
+  border-color: var(--cs-accent);
+  background: rgba(47, 168, 196, 0.18);
+  box-shadow: 0 0 0 1px rgba(47, 168, 196, 0.35);
+}
+
 .cs-list > button > div {
   min-width: 104px;
 }
@@ -5306,6 +5623,12 @@ table th {
 .cs-rank .pct {
   font-size: 12px;
   color: #a9bfd4;
+}
+/* 排行行：与环形图悬浮联动高亮 */
+.cockpit-screen .cs-rank li.active {
+  border-radius: 4px;
+  background: rgba(63, 201, 224, 0.14);
+  color: #f1f8ff;
 }
 .cs-alarms {
   display: flex;
@@ -6906,6 +7229,290 @@ table th {
 @media (max-width: 680px) {
   .rd-summary {
     grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ── 大屏列表自动上下滚动播放（巡检明细 / 告警 / SLA 倒计时） ──
+   隐藏滚动条、不提供手动上下拉动；内容不足一屏时保持静态 */
+.auto-scroll {
+  position: relative;
+  overflow: hidden;
+  /* 顶距由容器承担：内容份使用 padding 计高，保证循环位移无跳帧 */
+  margin-top: 8px;
+}
+.auto-scroll.fill {
+  flex: 1;
+  min-height: 76px;
+}
+.auto-scroll-inner {
+  display: block;
+}
+.auto-scroll-inner.play {
+  animation: auto-scroll-play var(--scroll-dur, 20s) linear infinite;
+}
+/* 鼠标悬停暂停播放：方便阅读与点击（离开后自动继续） */
+.auto-scroll:hover .auto-scroll-inner.play {
+  animation-play-state: paused;
+}
+@keyframes auto-scroll-play {
+  from {
+    transform: translateY(0);
+  }
+  to {
+    transform: translateY(calc(-1 * var(--scroll-h, 0px)));
+  }
+}
+/* 单份内容：覆盖列表自身的高度限制与滚动，交由外层容器裁剪 */
+.auto-scroll-seg {
+  margin: 0;
+  max-height: none;
+  overflow: visible;
+  padding-top: 6px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .auto-scroll-inner.play {
+    animation: none;
+  }
+}
+
+/* ── 驾驶舱卡片标题排版：窄栏下避免标题 / 统计 / 按钮被「逐字折行」 ──
+   文字整体不折行，靠 flex 换行；带操作按钮的卡：标题与按钮同行贴右，
+   统计信息换到第二行并单行省略 */
+.cockpit-screen .cs-card > h3 {
+  flex-wrap: wrap;
+  row-gap: 4px;
+  white-space: nowrap;
+}
+.cockpit-screen .cs-card > h3 > small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cockpit-screen .cs-card > h3 > .cs-range {
+  flex: none;
+}
+.cockpit-screen .cs-card > h3:has(> .cs-range) > small {
+  order: 3;
+  flex: 1 1 100%;
+}
+
+/* ── 驾驶舱·设备池：机器较多时在卡内上下滚动（可手动拖动查看全部设备） ──
+   限高 + 细滚动条；内容不足时按内容高度显示，不产生空白滚动区 */
+.cockpit-screen .cs-card.grow > .cs-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: clamp(200px, 34vh, 340px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 174, 204, 0.4) transparent;
+}
+.cockpit-screen .cs-card.grow > .cs-list::-webkit-scrollbar {
+  width: 6px;
+}
+.cockpit-screen .cs-card.grow > .cs-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cockpit-screen .cs-card.grow > .cs-list::-webkit-scrollbar-thumb {
+  border-radius: 3px;
+  background: rgba(148, 174, 204, 0.38);
+}
+.cockpit-screen .cs-card.grow > .cs-list::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 174, 204, 0.62);
+}
+
+/* 左栏（300px 定宽）内的设备筛选：保持纵向单列，避免被压成三列窄框 */
+.cockpit-screen .cs-left .ds-selects {
+  grid-template-columns: 1fr;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+/* 视频信息卡：未选中机器时的空白占位（与双画面同尺寸，保持卡片布局稳定） */
+.cockpit-screen .video-placeholder {
+  /* 与 Video 组件（缩略条 + 180px 画面 + 缩略条）等高，选中切换时卡片高度不跳动 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 240px;
+  border: 1px dashed rgba(148, 174, 204, 0.22);
+  border-radius: 4px;
+  background: rgba(11, 22, 38, 0.45);
+  color: #6d8095;
+  text-align: center;
+}
+.cockpit-screen .video-placeholder svg {
+  opacity: 0.55;
+}
+.cockpit-screen .video-placeholder b {
+  font-size: 12px;
+  font-weight: 600;
+  color: #a9bfd4;
+}
+.cockpit-screen .video-placeholder small {
+  font-size: 11px;
+  color: #6d8095;
+}
+
+/* 驾驶舱标题内的筛选下拉（如告警排行的区域）：与 cs-range 芯片按钮同风格 */
+.cockpit-screen .cs-range select {
+  height: 22px;
+  padding: 0 4px;
+  border: 1px solid rgba(148, 174, 204, 0.28);
+  border-radius: 4px;
+  background: rgba(14, 25, 42, 0.9);
+  color: #cfe0f0;
+  font-size: 12px;
+  cursor: pointer;
+}
+/* 排行列表在自动播放容器内：去掉自身纵向拉伸，交由容器裁剪 */
+.cockpit-screen .cs-rank-wrap .auto-scroll {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 任务行改为只读概要（明细收进「详情」弹窗）：整行不再可点，仅「详情」为操作入口 */
+.task-group-head {
+  cursor: default;
+}
+
+/* ── 巡检结果查询：任务行「详情」入口（朴素文字链接） ── */
+.task-group-head .tg-detail {
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--blue);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.task-group-head .tg-detail:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+/* ── 巡检结果详情：朴素版式（以表格线 + 文字为主，去掉卡片化装饰） ── */
+/* 概要：细线网格，标签与值同行；无底色、无圆角、无阴影 */
+.rd-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  background: none;
+}
+.rd-grid span {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 8px 10px;
+  border-right: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: #8794a3;
+}
+.rd-grid b {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #24384f;
+}
+.rd-grid .rd-bad {
+  color: #c0544a;
+}
+.rd-h {
+  margin: 16px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #5f7185;
+}
+.rd-table {
+  width: 100%;
+}
+.rd-table th {
+  white-space: nowrap;
+}
+.rd-table td {
+  vertical-align: middle;
+}
+/* 表格内弱化：状态不再用色块徽标，操作按钮去掉实底主色 */
+.rd-table .badge {
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 12px;
+  color: #5f7185;
+}
+.rd-table .badge.red {
+  color: #c0544a;
+}
+.rd-table .badge.amber {
+  color: #a07531;
+}
+.rd-table .badge.green {
+  color: #34806a;
+}
+.rd-table .btn.primary {
+  border-color: #ccd7e3;
+  background: #fff;
+  color: #24425e;
+}
+.rd-table .btn.primary:hover:not(:disabled) {
+  border-color: #8eafd1;
+  background: #f3f8fd;
+  color: var(--blue);
+}
+/* 图像缩略图：只作证据提示，尺寸收敛 */
+.rd-img {
+  display: block;
+  width: 76px;
+  border: 1px solid #eef1f5;
+  border-radius: 2px;
+}
+.rd-result {
+  max-width: 190px;
+}
+.rd-time {
+  white-space: nowrap;
+  color: #8794a3;
+}
+.rd-ai {
+  color: #5f7185;
+}
+.rd-ai.bad {
+  color: #c0544a;
+}
+/* 底部操作：左对齐普通按钮，与正文同一视觉层级 */
+.rd-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 16px;
+}
+.rd-actions .btn.primary {
+  border-color: #ccd7e3;
+  background: #fff;
+  color: #24425e;
+}
+.rd-actions .btn.primary:hover:not(:disabled) {
+  border-color: #8eafd1;
+  background: #f3f8fd;
+  color: var(--blue);
+}
+.rd-hint {
+  display: block;
+  margin-top: 8px;
+  font-size: 11px;
+  color: #9aa9b8;
+  text-align: left;
+}
+@media (max-width: 1240px) {
+  .rd-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 

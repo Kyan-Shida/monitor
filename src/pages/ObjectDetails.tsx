@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useStore } from "../data/store";
 import { go } from "../data/navigation";
-import { ObjectLink, EventTimeline, Pager } from "../components/Business";
+import { ObjectLink, Pager } from "../components/Business";
+import { ReplayDetail } from "../components/ReplayDetail";
+import { ResultView } from "../components/ResultView";
 import { Panel, Table, Badge, Btn, Note } from "../components/UI";
 import { stageOf, deviceCode, fmtTime, queueFor, terminal } from "../data/selectors";
 export function ObjectDetails({ page, id }: { page: string; id?: string }) {
@@ -64,7 +66,12 @@ export function ObjectDetails({ page, id }: { page: string; id?: string }) {
               rows={s.results
                 .filter((r) => r.pointId === p.id)
                 .map((r) => [
-                  <ObjectLink type="replay" id={r.taskId} />,
+                  <ObjectLink
+                    type="replay"
+                    id={r.taskId}
+                    to="replay-detail"
+                    from={{ page: "point", id: p.id }}
+                  />,
                   r.final + r.unit,
                   <Badge>{r.abnormal ? "异常" : "正常"}</Badge>,
                   <ObjectLink type="review" id={r.id} />,
@@ -75,32 +82,18 @@ export function ObjectDetails({ page, id }: { page: string; id?: string }) {
       </>
     );
   }
-  // 「执行回溯」内置页（设备巡检档案目录下）：只读回看单个已结束任务的执行事件与证据时间轴
+  // 「巡检结果详情」内置页（设备巡检档案目录下，非弹窗）：任务概要 + AI 识别结果（表计识别 / 云台动作）+ 复核
+  if (page === "result-view") {
+    const tk = s.tasks.find((x) => x.id === id);
+    if (!tk) return <Note>未找到该任务。</Note>;
+    return <ResultView task={tk} />;
+  }
+  // 「执行回溯」内置页（设备巡检档案目录下）：与「巡检结果详情」同版式——
+  // 左侧「可见光 + 红外」双画面 + 导航地图（点位与巡检路径），右侧任务汇总 + 巡检结果 / 风险记录 / 执行事件
   if (page === "replay-detail") {
     const tk = s.tasks.find((x) => x.id === id);
     if (!tk) return <Note>未找到该任务。</Note>;
-    return (
-      <>
-        <div className="context-bar">
-          <b>
-            {tk.id} · {tk.name}
-          </b>
-          <Badge>{tk.state}</Badge>
-          <span className="muted">机器人 {tk.robotId || "未分配"}</span>
-          <span className="muted">
-            完成 {tk.done.length}/{tk.items.length} · 失败 {tk.skipped.length}
-          </span>
-          <span className="muted">结束 {fmtTime(tk.finishedAt)}</span>
-          <div className="actions">
-            <Btn onClick={() => go("replay", tk.id)}>打开完整回溯列表</Btn>
-          </div>
-        </div>
-        <Panel title="执行事件与证据时间轴">
-          <EventTimeline taskId={tk.id} />
-          {tk.failure && <Note>失败原因：{tk.failure}</Note>}
-        </Panel>
-      </>
-    );
+    return <ReplayDetail task={tk} />;
   }
   const t =
     s.tasks.find((t) => t.id === id) ||
@@ -235,16 +228,7 @@ export function ObjectDetails({ page, id }: { page: string; id?: string }) {
         </Panel>
         <div className="replay-detail">
           {cur ? (
-            <>
-              <div className="replay-endinfo">
-                <span><i>任务</i>{cur.id} · {cur.name}</span>
-                <span><i>结束状态</i><Badge>{cur.state}</Badge></span>
-                <span><i>结束时间</i>{fmtTime(cur.finishedAt)}</span>
-              </div>
-              <Panel title="执行事件与证据时间轴">
-                <EventTimeline taskId={cur.id} />
-              </Panel>
-            </>
+            <ReplayDetail task={cur} />
           ) : (
             <Note>请选择左侧已结束的任务，查看其执行回溯记录。</Note>
           )}
@@ -399,7 +383,16 @@ export function ObjectDetails({ page, id }: { page: string; id?: string }) {
                 任务引用创建时的业务快照，地图或点位维护不会回写历史要求。机器人任务结束回报后，平台仍按有效检测项判定完整性。
               </Note>
               {terminal.includes(t.state) && (
-                <Btn onClick={() => go("replay", t.id)}>执行回溯与接管记录</Btn>
+                <Btn
+                  onClick={() =>
+                    go("replay-detail", t.id, undefined, {
+                      page: "tasks",
+                      id: t.id,
+                    })
+                  }
+                >
+                  执行回溯与接管记录
+                </Btn>
               )}
             </Panel>
           </div>

@@ -4,8 +4,11 @@ import { transition, type Action } from "./engine";
 import { roleOf } from "./roles";
 import type { State } from "./types";
 const KEY = "inspection-v14-prototype";
-/** 当前数据模型版本，须与 types.ts 的 State.schema 一致 */
-const SCHEMA = 5;
+/**
+ * 当前数据模型 / 种子数据版本，须与 seed() 产出的 State.schema 一致；
+ * 提升版本会让旧本地缓存无法迁移，从而回落到 seed()（用于演示数据扩充后强制刷新）
+ */
+const SCHEMA = 7;
 /**
  * 老缓存升级：schema 1 → 2 时补齐工单/验收/接管/反馈等新增集合，
  * 并按序回填机型、移动能力、约束、健康度、固件字段，避免页面读到 undefined；

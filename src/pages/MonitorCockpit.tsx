@@ -12,6 +12,8 @@ import { Badge, Btn, Note, Table } from "../components/UI";
 import { Donut, Ring } from "../components/Charts";
 import { Sparkline } from "../components/Sparkline";
 import { MapCanvas } from "../components/MapCanvas";
+import { AutoScrollList } from "../components/AutoScrollList";
+import { go } from "../data/navigation";
 import { ScreenTopBar, type CockpitId } from "../components/ScreenTopBar";
 import {
   METRIC_CONFIG,
@@ -25,8 +27,19 @@ import type { MetricPoint } from "../data/metricHistory";
 import { deviceProfile, deviceTypes } from "../data/deviceProfile";
 import { terminal } from "../data/selectors";
 
-/** 告警排行分段配色（沉稳工业深色板：降饱和青蓝/蓝/紫/琥珀） */
-const RANK_COLORS = ["#3aa7c9", "#5b8fe0", "#8a74d6", "#d39a3c"];
+/** 告警排行分段配色（沉稳工业深色板：降饱和青蓝/蓝/紫/琥珀，扩展到 TOP10） */
+const RANK_COLORS = [
+  "#3aa7c9",
+  "#5b8fe0",
+  "#8a74d6",
+  "#d39a3c",
+  "#4fae8e",
+  "#c96f6a",
+  "#6cb3d6",
+  "#7d8fd8",
+  "#b189d0",
+  "#c9a35a",
+];
 /** 任务状态分布配色（与色板一致，状态语义靠色相、不靠高饱和发光） */
 const TASK_COLORS = { 执行中: "#3aa7c9", 已完成: "#5b8fe0", 待调度: "#d39a3c", 已终止: "#d06a63" };
 
@@ -51,6 +64,13 @@ export function MonitorCockpit({
   const [range, SETRANGE] = useState<"今日" | "近7天" | "近30天" | "全部">("近7天");
   const [trendRange, SETTREND] = useState<"近7天" | "近30天">("近7天");
   const [openMetric, OPENM] = useState("");
+  // 高亮凸显的机器：点击左侧设备列表 / 地图机器时联动，再次点击取消
+  const [robotId, SETRID] = useState<string | null>(null);
+  /** 设备卡内筛选：机型 / 状态（厂区沿用工具条筛选，二者同源） */
+  const [devF, SETDEV] = useState("全部机型");
+  const [stateF, SETSTATEF] = useState("全部状态");
+  /** 设备池「全选」：一次选中当前筛选的全部机器（地图全部高亮） */
+  const [allSel, SETALL] = useState(false);
   const [fs, FS] = useState(false);
   const [history, SETH] = useState(() => readHistory());
   const shellRef = useRef<HTMLDivElement>(null);
@@ -68,6 +88,18 @@ export function MonitorCockpit({
   const mv = (key: string) => metricValue(sc, key);
   const TODAY = localDay();
   const MONTH = TODAY.slice(0, 7);
+
+  /** 设备卡列表与分布：按卡内机型 / 状态筛选（厂区由工具条统一控制） */
+  const listRobots = sc.robots.filter((r) => {
+    if (devF !== "全部机型" && r.deviceType !== devF) return false;
+    if (stateF === "任务中" && r.state !== "执行中") return false;
+    if (stateF === "异常" && !["故障", "离线", "人工接管"].includes(r.state)) return false;
+    if (stateF === "充电" && r.state !== "充电") return false;
+    if (stateF === "空闲" && r.state !== "空闲") return false;
+    return true;
+  });
+  /** 单台生效的高亮机器：全选状态下不指定单台 */
+  const activeRobot = allSel ? null : robotId;
 
   // 进入驾驶舱时采样一次指标，用于趋势折线与环比（按日采样，不插值补造）
   useEffect(() => {
@@ -117,21 +149,48 @@ export function MonitorCockpit({
     return out;
   }, [s.alarms, trendDays]);
 
-  // ── 告警排行：按点位聚合 ──
+  // ── 告警排行：按点位聚合，支持区域 + 时间筛选，取 TOP10 ──
+  /** 排行时间范围（卡内独立筛选，默认近 7 天） */
+  const [rankRange, SETRANKRANGE] = useState<"今日" | "近7天" | "近30天" | "全部">("近7天");
+  /** 环形图悬浮的分段：与排行列表联动高亮 */
+  const [rankHover, SETRANKHOVER] = useState<number | null>(null);
+  /** 时间起点：今日按自然日，近 7/30 天按当前时间回推 */
+  const rankStart = useMemo(() => {
+    if (rankRange === "全部") return 0;
+    if (rankRange === "今日") return parseTime(TODAY + " 00:00");
+    return Date.now() - (rankRange === "近7天" ? 7 : 30) * 86400000;
+  }, [rankRange, TODAY]);
+  /** 区域 + 时间过滤后的告警（区域经任务归到机器所属厂区） */
+  const rankAlarms = useMemo(
+    () =>
+      s.alarms
+        .filter((a) => {
+          if (rankRange === "全部") return true;
+          if (rankRange === "今日") return a.time.slice(0, 10) === TODAY;
+          const t = parseTime(a.time);
+          return Number.isFinite(t) && t >= rankStart;
+        })
+        .filter((a) => {
+          if (region === "全部区域") return true;
+          const rid = s.tasks.find((t) => t.id === a.taskId)?.robotId;
+          return s.robots.find((r) => r.id === rid)?.region === region;
+        }),
+    [s.alarms, s.tasks, s.robots, rankRange, rankStart, region, TODAY],
+  );
   const rank = useMemo(() => {
     const map = new Map<string, number>();
-    s.alarms.forEach((a) => map.set(a.pointId, (map.get(a.pointId) || 0) + 1));
+    rankAlarms.forEach((a) => map.set(a.pointId, (map.get(a.pointId) || 0) + 1));
     return [...map.entries()]
       .sort((a, b) => b[1] - a[1])
-      .slice(0, 4)
+      .slice(0, 10)
       .map(([pid, value], i) => ({
         pid,
         name: s.points.find((p) => p.id === pid)?.name || pid,
         value,
         color: RANK_COLORS[i % RANK_COLORS.length],
       }));
-  }, [s.alarms, s.points]);
-  const rankTotal = rank.reduce((a, x) => a + x.value, 0);
+  }, [rankAlarms, s.points]);
+  const rankTotal = rankAlarms.length;
 
   // ── 今日告警 ──
   const todayAlarms = s.alarms.filter((a) => a.time.slice(0, 10) === TODAY);
@@ -213,14 +272,27 @@ export function MonitorCockpit({
           <section className="cs-card grow">
             <h3>
               设备状态
-              <small>共 {sc.robots.length} 台</small>
+              <small>共 {listRobots.length} 台</small>
+              {/* 全选：一次选中当前筛选的全部机器（地图全部高亮） */}
+              <span className="cs-range">
+                <button
+                  className={allSel ? "active" : ""}
+                  title="一次选中当前筛选的全部机器"
+                  onClick={() => {
+                    SETALL(!allSel);
+                    SETRID(null);
+                  }}
+                >
+                  {allSel ? "取消全选" : "全选"}
+                </button>
+              </span>
             </h3>
             <div className="cs-nums">
               {[
-                { n: mv("onlineCount"), label: "在线" },
-                { n: sc.robots.filter((r) => r.state === "离线").length, label: "离线" },
-                { n: sc.robots.filter((r) => r.state === "执行中").length, label: "巡检中" },
-                { n: sc.robots.filter((r) => r.state === "空闲").length, label: "待机" },
+                { n: listRobots.filter((r) => r.state !== "离线").length, label: "在线" },
+                { n: listRobots.filter((r) => r.state === "离线").length, label: "离线" },
+                { n: listRobots.filter((r) => r.state === "执行中").length, label: "巡检中" },
+                { n: listRobots.filter((r) => r.state === "空闲").length, label: "待机" },
               ].map((x) => (
                 <div className="cs-num" key={x.label}>
                   <b>{x.n}</b>
@@ -228,9 +300,34 @@ export function MonitorCockpit({
                 </div>
               ))}
             </div>
-            <div className="cs-list readonly">
-              {sc.robots.map((r) => (
-                <button key={r.id}>
+            {/* 设备筛选：机型 / 状态（厂区由顶部工具条统一控制，避免重复入口） */}
+            <div className="ds-selects">
+              <select aria-label="机型" value={devF} onChange={(e) => SETDEV(e.target.value)}>
+                {["全部机型", ...deviceTypes].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+              <select
+                aria-label="状态"
+                value={stateF}
+                onChange={(e) => SETSTATEF(e.target.value)}
+              >
+                {["全部状态", "任务中", "空闲", "充电", "异常"].map((x) => (
+                  <option key={x}>{x}</option>
+                ))}
+              </select>
+            </div>
+            <div className="cs-list">
+              {listRobots.map((r) => (
+                <button
+                  key={r.id}
+                  className={allSel || robotId === r.id ? "active" : ""}
+                  title="点击在地图中高亮该机器；再次点击取消"
+                  onClick={() => {
+                    SETALL(false);
+                    SETRID(robotId === r.id ? null : r.id);
+                  }}
+                >
                   <i
                     className="cs-dot"
                     style={{ background: r.state === "离线" ? "#8794a3" : r.battery < r.constraints.minBattery ? "#d39a3c" : "#3aa7c9" }}
@@ -248,7 +345,11 @@ export function MonitorCockpit({
                   <em className="cs-battery">{r.battery}%</em>
                 </button>
               ))}
-              {!sc.robots.length && <Note>当前厂区无设备。</Note>}
+              {!listRobots.length && (
+                <Note>
+                  {sc.robots.length ? "当前筛选条件下无设备。" : "当前厂区无设备。"}
+                </Note>
+              )}
             </div>
           </section>
 
@@ -298,13 +399,19 @@ export function MonitorCockpit({
             <div className="cs-map">
               <MapCanvas
                 points={sc.points}
-                robots={sc.robots}
+                robots={listRobots}
                 chargers={
                   region === "全部区域"
                     ? s.chargers
                     : s.chargers.filter((c) => c.region === region)
                 }
                 rails={s.railSections}
+                selectedRobot={activeRobot || undefined}
+                highlightAll={allSel}
+                onRobot={(id) => {
+                  SETALL(false);
+                  SETRID(robotId === id ? null : id);
+                }}
                 fit="xMidYMid slice"
               />
             </div>
@@ -325,26 +432,58 @@ export function MonitorCockpit({
 
           <section className="cs-card">
             <h3>
-              告警排行
-              <small>按点位聚合 · 共 {rankTotal} 次</small>
+              告警排行 TOP10
+              <small>
+                按点位聚合 · {rankRange} · 共 {rankTotal} 次 · 自动播放
+              </small>
+              {/* 区域 + 时间筛选：区域与工具条厂区同源 */}
+              <span className="cs-range">
+                <select
+                  aria-label="区域"
+                  value={region}
+                  onChange={(e) => SETR(e.target.value)}
+                >
+                  {["全部区域", ...new Set(s.robots.map((r) => r.region))].map(
+                    (x) => (
+                      <option key={x}>{x}</option>
+                    ),
+                  )}
+                </select>
+                {(["今日", "近7天", "近30天", "全部"] as const).map((x) => (
+                  <button
+                    key={x}
+                    className={rankRange === x ? "active" : ""}
+                    onClick={() => SETRANKRANGE(x)}
+                  >
+                    {x}
+                  </button>
+                ))}
+              </span>
             </h3>
             <div className="cs-rank-wrap">
-              <ul className="cs-rank">
-                {!rank.length && <li>暂无告警记录</li>}
-                {rank.map((x, i) => (
-                  <li key={x.pid}>
-                    <span className="idx" style={{ background: x.color }}>
-                      {i + 1}
-                    </span>
-                    <span className="name">{x.name}</span>
-                    <span className="pct">
-                      {x.value} 次 ·{" "}
-                      {rankTotal ? Math.round((x.value / rankTotal) * 100) : 0}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
-              <Donut data={rank.map((x) => ({ label: x.name, value: x.value, color: x.color }))} center={`${rankTotal}`} />
+              {/* 排行列表：自动上下滚动播放（无滚动条、不可手动拉动） */}
+              <AutoScrollList rows={3}>
+                <ul className="cs-rank">
+                  {!rank.length && <li>暂无告警记录</li>}
+                  {rank.map((x, i) => (
+                    <li key={x.pid} className={rankHover === i ? "active" : ""}>
+                      <span className="idx" style={{ background: x.color }}>
+                        {i + 1}
+                      </span>
+                      <span className="name">{x.name}</span>
+                      <span className="pct">
+                        {x.value} 次 ·{" "}
+                        {rankTotal ? Math.round((x.value / rankTotal) * 100) : 0}%
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </AutoScrollList>
+              <Donut
+                data={rank.map((x) => ({ label: x.name, value: x.value, color: x.color }))}
+                center={`${rankTotal}`}
+                onHover={SETRANKHOVER}
+              />
             </div>
           </section>
         </main>
@@ -354,7 +493,12 @@ export function MonitorCockpit({
           <section className="cs-card grow">
             <h3>
               今日告警
-              <small>{TODAY}</small>
+              <small>
+                {TODAY} · {openAlarms.length} 条未关闭 · 自动播放
+              </small>
+              <span className="cs-range">
+                <button onClick={() => go("alarms")}>全部告警 ›</button>
+              </span>
             </h3>
             <div className="cs-nums cs-nums-2">
               <div className="cs-num">
@@ -366,9 +510,10 @@ export function MonitorCockpit({
                 <span>未处理</span>
               </div>
             </div>
-            <div className="cs-alarms readonly">
+            {/* 未关闭告警：自动上下滚动播放（鼠标悬停暂停）；列表为只读展示，下钻统一走卡头「全部告警 ›」 */}
+            <AutoScrollList listClass="cs-alarms readonly" rows={3}>
               {!openAlarms.length && <span className="cs-empty">当前无未关闭告警</span>}
-              {openAlarms.slice(0, 4).map((a) => (
+              {openAlarms.map((a) => (
                 <button key={a.id}>
                   <b>{a.name}</b>
                   <small>
@@ -377,7 +522,7 @@ export function MonitorCockpit({
                   <em>{a.state}</em>
                 </button>
               ))}
-            </div>
+            </AutoScrollList>
           </section>
 
           <section className="cs-card">

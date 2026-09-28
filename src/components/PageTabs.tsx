@@ -47,7 +47,9 @@ function loadTabs(): PageTab[] {
   try {
     const arr = JSON.parse(sessionStorage.getItem(STORE_KEY) || "[]");
     return Array.isArray(arr)
-      ? arr.filter((t: PageTab) => t && t.page && t.name)
+      ? arr.filter(
+          (t: PageTab) => t && t.page && t.name && !metaOf(t.page)?.parent,
+        )
       : [];
   } catch {
     return [];
@@ -84,27 +86,39 @@ export function PageTabs({
 }) {
   const [tabs, setTabs] = useState<PageTab[]>(loadTabs);
   const [menuOpen, setMenuOpen] = useState(false);
-  const activeKey = tabKey(route.page, route.id);
+  // 内置页（有 parent）复用其父级「二级目录」页签，不单独展示；页签仅登记二级目录页面
+  const activeMeta = metaOf(route.page);
+  const activePage = activeMeta?.parent || route.page;
+  const activeId = activeMeta?.parent ? undefined : route.id;
+  const activeKey = tabKey(activePage, activeId);
 
-  // 首次挂载：保证常驻工作台页签存在
+  // 首次挂载：清理残留的内置页页签（有 parent 的），并保证常驻工作台页签存在
   useEffect(() => {
     setTabs((prev) => {
-      if (prev.some((t) => t.key === PINNED)) return prev;
+      const cleaned = prev.filter(
+        (t) => t.key === PINNED || !metaOf(t.page)?.parent,
+      );
+      if (cleaned.some((t) => t.key === PINNED)) return cleaned;
       const meta = metaOf(PINNED);
       return meta
         ? [
             { key: PINNED, page: PINNED, name: meta.name, group: meta.group },
-            ...prev,
+            ...cleaned,
           ]
-        : prev;
+        : cleaned;
     });
   }, []);
 
-  // 路由变化：登记新页签；同页签内切换子 Tab 时仅更新记忆，便于切回时还原
+  // 路由变化：登记新页签；内置页（有 parent）归属其父级「二级目录」页签，不单独展示
   useEffect(() => {
     const meta = metaOf(route.page);
     if (!meta) return; // 未知路由不登记
-    const key = tabKey(route.page, route.id);
+    // 内置页复用父级「二级目录」页签
+    const tabPage = meta.parent || route.page;
+    const tabId = meta.parent ? undefined : route.id;
+    const tabMeta = metaOf(tabPage);
+    if (!tabMeta) return;
+    const key = tabKey(tabPage, tabId);
     setTabs((prev) => {
       const exists = prev.find((t) => t.key === key);
       if (exists)
@@ -115,11 +129,11 @@ export function PageTabs({
         ...prev,
         {
           key,
-          page: route.page,
-          id: route.id,
+          page: tabPage,
+          id: tabId,
           tab: route.tab,
-          name: meta.name + (route.id ? ` · ${route.id}` : ""),
-          group: meta.group,
+          name: tabMeta.name,
+          group: tabMeta.group,
         },
       ];
       // 超限淘汰：移除最早的非常驻、非当前页签
